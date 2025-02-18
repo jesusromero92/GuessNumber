@@ -119,6 +119,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
   final ScrollController _scrollController = ScrollController();
   String myNumber = "Cargando..."; // 🔥 Tu número secreto
   String turnUsername = ""; // 🔥 Nuevo: Guarda el usuario del turno actual
+  bool isTurnDefined = false; // 🔥 Para evitar mostrar el turno antes de tiempo
 
 
   @override
@@ -187,6 +188,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
           // 🔥 Asegurar que el servidor envía el campo correcto (puede ser "turn" en lugar de "turnUsername")
           setState(() {
             turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
+            isTurnDefined = true; // 🔥 Para evitar mostrar el turno antes de tiempo
           });
         }
       } catch (e) {
@@ -275,18 +277,19 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("Sala: $roomId"),
-            AnimatedSwitcher(
-              duration: Duration(milliseconds: 300),
-              child: Text(
-                isMyTurn ? "Tu turno" : "Turno del oponente",
-                key: ValueKey(turnUsername), // 🔥 Cambio animado en AppBar
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isMyTurn ? Colors.blue : Colors.red, // 🔥 Azul si es tu turno, rojo si no
+            if (isTurnDefined) // 🔥 Solo mostrar cuando se defina el turno
+              AnimatedSwitcher(
+                duration: Duration(milliseconds: 300),
+                child: Text(
+                  isMyTurn ? "Tu turno" : "Turno del oponente",
+                  key: ValueKey(turnUsername), // 🔥 Cambio animado en AppBar
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isMyTurn ? Colors.blue : Colors.red, // 🔥 Azul si es tu turno, rojo si no
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -382,36 +385,43 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
           // 🔥 Input y botón de envío modernizados
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(12.0),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center, // 🔥 Asegura alineación vertical con el input
               children: [
                 Expanded(
                   child: TextField(
                     controller: _controller,
                     keyboardType: TextInputType.number,
                     maxLength: 4,
+                    enabled: isMyTurn,
                     style: TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: Colors.grey[850],
-                      hintText: "Ingresa un número",
-                      hintStyle: TextStyle(color: Colors.white54),
+                      fillColor: isMyTurn ? Colors.grey[900] : Colors.grey[800],
+                      hintText: isMyTurn ? "Introduce un número..." : "Esperando turno...",
+                      hintStyle: TextStyle(color: isMyTurn ? Colors.white70 : Colors.grey),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(10),
                       ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 20), // 🔥 Centra texto en input
                     ),
-                    onSubmitted: (_) => _sendGuess(),
+                    onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
                   ),
                 ),
-                SizedBox(width: 10),
-                IconButton(
-                  icon: Icon(Icons.send, color: Colors.blue),
-                  onPressed: _sendGuess,
+                SizedBox(width: 8),
+                Container(
+                  margin: EdgeInsets.only(bottom: 20), // 🔥 Agrega margen inferior al icono
+                  child: IconButton(
+                    icon: Icon(Icons.send, color: isMyTurn ? Colors.blue : Colors.grey),
+                    onPressed: isMyTurn ? _sendGuess : null,
+                    iconSize: 28, // 🔥 Ajuste del tamaño del icono
+                  ),
                 ),
               ],
             ),
           ),
+
         ],
       ),
     );
