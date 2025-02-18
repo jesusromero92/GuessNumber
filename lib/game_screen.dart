@@ -500,12 +500,16 @@ class _GameScreenState extends State<GameScreenGame> {
                     ),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center, // Asegura que los iconos se alineen
                     children: [
-                      // 🔥 Botón para abrir los emojis
-                      IconButton(
-                        icon: Icon(Icons.emoji_emotions_outlined,
-                            color: Colors.yellowAccent, size: 28),
-                        onPressed: _showEmojiPicker,
+                      // 🔥 Botón para abrir los emojis con margen superior
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 20), // Sube el icono
+                        child: IconButton(
+                          icon: Icon(Icons.emoji_emotions_outlined,
+                              color: Colors.yellowAccent, size: 28),
+                          onPressed: _showEmojiPicker,
+                        ),
                       ),
                       SizedBox(width: 8),
 
@@ -528,20 +532,22 @@ class _GameScreenState extends State<GameScreenGame> {
                               borderRadius: BorderRadius.circular(30),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: EdgeInsets.symmetric(
-                                vertical: 14, horizontal: 20),
+                            contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                           ),
                           onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
                         ),
                       ),
                       SizedBox(width: 8),
 
-                      // ✅ Botón de enviar intento
-                      IconButton(
-                        icon: Icon(Icons.send,
-                            color: isMyTurn ? Colors.blue : Colors.grey,
-                            size: 28),
-                        onPressed: isMyTurn ? _sendGuess : null,
+                      // ✅ Botón de enviar intento con margen superior
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 20), // Sube el icono
+                        child: IconButton(
+                          icon: Icon(Icons.send,
+                              color: isMyTurn ? Colors.blue : Colors.grey,
+                              size: 28),
+                          onPressed: isMyTurn ? _sendGuess : null,
+                        ),
                       ),
                     ],
                   ),
