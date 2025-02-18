@@ -108,15 +108,21 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
   String username = "";
   String roomId = "";
   bool isWaiting = true;
+  final ScrollController _scrollController = ScrollController();
+
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)!.settings.arguments as Map;
+    final args = ModalRoute
+        .of(context)!
+        .settings
+        .arguments as Map;
     username = args['username'];
     roomId = args['roomId'];
 
-    _channel = IOWebSocketChannel.connect('ws://109.123.248.19:4000/ws/rooms/$roomId');
+    _channel =
+        IOWebSocketChannel.connect('ws://109.123.248.19:4000/ws/rooms/$roomId');
 
     _channel!.stream.listen((message) {
       try {
@@ -124,7 +130,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
         if (data["type"] == "attempt") {
           setState(() {
-            attempts.insert(0, { // 🔥 Ahora los mensajes van de arriba hacia abajo
+            attempts.add({ // 🔥 Ahora los mensajes nuevos se agregan al final
               "username": data["username"] ?? "Desconocido",
               "guess": data["guess"]?.toString() ?? "???"
             });
@@ -132,31 +138,34 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
         } else if (data["type"] == "game_won") {
           // 🔥 Añadir mensaje de ganador al chat
           setState(() {
-            attempts.insert(0, {
+            attempts.add({
               "username": "Sistema",
               "guess": data["message"]
             });
           });
+          _scrollToBottom(); // 🔥 Desplazar automáticamente el chat
 
           // 🔥 Mostrar alerta emergente y volver al menú
           showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: Text("¡Juego terminado!"),
-              content: Text(data["message"]),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    // 🔥 Eliminar la sala en el cliente antes de salir
-                    await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+            builder: (context) =>
+                AlertDialog(
+                  title: Text("¡Juego terminado!"),
+                  content: Text(data["message"]),
+                  actions: [
+                    TextButton(
+                      onPressed: () async {
+                        // 🔥 Eliminar la sala en el cliente antes de salir
+                        await http.delete(Uri.parse(
+                            'http://109.123.248.19:4000/api/rooms/$roomId'));
 
-                    Navigator.pop(context);
-                    Navigator.pop(context); // Vuelve al menú principal
-                  },
-                  child: Text("Aceptar"),
+                        Navigator.pop(context);
+                        Navigator.pop(context); // Vuelve al menú principal
+                      },
+                      child: Text("Aceptar"),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           );
         }
       } catch (e) {
@@ -164,11 +173,17 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
       }
     });
 
-
-
-
-
     _checkPlayersInRoom();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.minScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   // Método para verificar la cantidad de jugadores en la sala
@@ -224,55 +239,62 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                 Text("Esperando al otro jugador..."),
               ],
             )
-                : ListView.builder(
-              reverse: false, // Mensajes más recientes abajo
-              itemCount: attempts.length,
-              itemBuilder: (context, index) {
-                final attempt = attempts[index];
-                bool isMyAttempt = attempt["username"] == username;
-                return Align(
-                  alignment: isMyAttempt
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        vertical: 10, horizontal: 14),
-                    margin:
-                    EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: isMyAttempt ? Colors.blue : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isMyAttempt
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isMyAttempt ? "Tú" : attempt["username"]!,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isMyAttempt
-                                ? Colors.white
-                                : Colors.black87,
+                : SingleChildScrollView(
+              controller: _scrollController,
+              child: Column(
+                children: [
+                  ListView.builder(
+                    controller: _scrollController,
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    itemCount: attempts.length,
+                    itemBuilder: (context, index) {
+                      final attempt = attempts[index];
+                      bool isMyAttempt = attempt["username"] == username;
+                      return Align(
+                        alignment: isMyAttempt
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              vertical: 10, horizontal: 14),
+                          margin: EdgeInsets.symmetric(
+                              vertical: 5, horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: isMyAttempt ? Colors.blue : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: isMyAttempt
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isMyAttempt ? "Tú" : attempt["username"]!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isMyAttempt ? Colors.white : Colors
+                                      .black87,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                attempt["guess"]!,
+                                style: TextStyle(
+                                  color: isMyAttempt ? Colors.white : Colors
+                                      .black87,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          attempt["guess"]!,
-                          style: TextStyle(
-                            color: isMyAttempt
-                                ? Colors.white
-                                : Colors.black87,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
+                ],
+              ),
             ),
           ),
           Padding(
