@@ -30,60 +30,165 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MainScreen extends StatelessWidget {
+class MainScreen extends StatefulWidget {
+  @override
+  _MainScreenState createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _roomController = TextEditingController();
+  bool _snackbarShown = false; // 🔥 Nueva variable de estado para evitar mensajes repetidos
+
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // 🔥 Verifica si hay un mensaje y aún no se ha mostrado
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+
+    if (args != null && args.containsKey("snackbarMessage") && !_snackbarShown) {
+      _snackbarShown = true; // 🔥 Evita que el mensaje se muestre más de una vez
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(args["snackbarMessage"])),
+        );
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Ingresar a una Sala")),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: "Nombre de Usuario",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 10),
-            TextField(
-              controller: _roomController,
-              decoration: InputDecoration(
-                labelText: "ID de la Sala",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                if (_nameController.text.isNotEmpty &&
-                    _roomController.text.isNotEmpty) {
-                  await createRoom(_roomController.text, _nameController.text);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute
+          .of(context)
+          ?.settings
+          .arguments as Map?;
+      if (args != null && args.containsKey("message")) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(args["message"])),
+        );
+      }
+    });
 
-                  Navigator.pushNamed(
-                    context,
-                    '/game',
-                    arguments: {
-                      'username': _nameController.text,
-                      'roomId': _roomController.text,
-                    },
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Por favor, ingresa todos los datos")),
-                  );
-                }
-              },
-              child: Text("Crear Sala"),
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 🔥 Fondo con imagen y opacidad
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage("assets/background.png"),
+                // Asegúrate de tener esta imagen en assets
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                    Colors.black.withOpacity(0.6), BlendMode.darken),
+              ),
             ),
-          ],
-        ),
+          ),
+
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 🔥 Icono llamativo
+                  Icon(Icons.videogame_asset_rounded, color: Colors.white,
+                      size: 100),
+
+                  SizedBox(height: 20),
+
+                  // 🔥 Título principal
+                  Text(
+                    "¡Adivina el Número!",
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  SizedBox(height: 30),
+
+                  // 🔥 Input para Nombre de Usuario
+                  TextField(
+                    controller: _nameController,
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.2),
+                      hintText: "Nombre de usuario",
+                      hintStyle: TextStyle(color: Colors.white70),
+                      prefixIcon: Icon(Icons.person, color: Colors.white),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 15),
+
+                  // 🔥 Input para ID de la Sala
+                  TextField(
+                    controller: _roomController,
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.2),
+                      hintText: "ID de Sala",
+                      hintStyle: TextStyle(color: Colors.white70),
+                      prefixIcon: Icon(Icons.meeting_room, color: Colors.white),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 25),
+
+                  // 🔥 Botón Animado con diseño moderno
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_nameController.text.isNotEmpty &&
+                          _roomController.text.isNotEmpty) {
+                        await createRoom(
+                            _roomController.text, _nameController.text);
+
+                        Navigator.pushNamed(
+                          context,
+                          '/game',
+                          arguments: {
+                            'username': _nameController.text,
+                            'roomId': _roomController.text,
+                          },
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(
+                              "Por favor, ingresa todos los datos")),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 40, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                    child: Text("Unirse a la Sala",
+                        style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -151,7 +256,8 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
             });
           });
           _scrollToBottom();
-        } else if (data["type"] == "game_won") {
+        }
+        else if (data["type"] == "game_won") {
           setState(() {
             attempts.add({
               "username": "Sistema",
@@ -168,7 +274,8 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
               actions: [
                 TextButton(
                   onPressed: () async {
-                    await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+                    await http.delete(Uri.parse(
+                        'http://109.123.248.19:4000/api/rooms/$roomId'));
                     _channel?.sink.close();
                     _channel = null;
                     setState(() {
@@ -176,28 +283,40 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                       isWaiting = true;
                     });
 
-                    Navigator.pop(context);
-                    Navigator.pop(context);
+                    if (mounted) {
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                    }
                   },
                   child: Text("Aceptar"),
                 ),
               ],
             ),
           );
-        } else if (data["type"] == "turn") {
+        }
+        else if (data["type"] == "turn") {
           // 🔥 Asegurar que el servidor envía el campo correcto (puede ser "turn" en lugar de "turnUsername")
           setState(() {
             turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
             isTurnDefined = true; // 🔥 Para evitar mostrar el turno antes de tiempo
           });
         }
+        else if (data["type"] == "player_left") {
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed(
+              '/',
+              arguments: {"snackbarMessage": "${data['username']} ha abandonado la sala."},
+            );
+          }
+        }
+
       } catch (e) {
         print("❌ Error al decodificar mensaje: $e");
       }
     });
 
     _checkPlayersInRoom();
-  }
+}
 
 
   void _scrollToBottom() {
@@ -247,6 +366,30 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
     super.dispose();
   }
 
+
+  Future<bool> _handleExit() async {
+    try {
+      await http.delete(
+          Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+
+      _channel?.sink.add(jsonEncode({
+        "type": "player_left",
+        "username": username
+      }));
+
+      _channel?.sink.close();
+      _channel = null;
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      print("❌ Error al salir de la sala: $e");
+    }
+
+    return Future.value(true);
+  }
+
   // 🔥 Nueva función para obtener tu número secreto
   Future<void> _fetchMyNumber() async {
     try {
@@ -270,159 +413,184 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
   Widget build(BuildContext context) {
     bool isMyTurn = turnUsername == username; // 🔥 Verifica si es tu turno
 
-    return Scaffold(
-      backgroundColor: Colors.black, // 🔥 Fondo negro moderno
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Sala: $roomId"),
-            if (isTurnDefined) // 🔥 Solo mostrar cuando se defina el turno
-              AnimatedSwitcher(
-                duration: Duration(milliseconds: 300),
-                child: Text(
-                  isMyTurn ? "Tu turno" : "Turno del oponente",
-                  key: ValueKey(turnUsername), // 🔥 Cambio animado en AppBar
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isMyTurn ? Colors.blue : Colors.red, // 🔥 Azul si es tu turno, rojo si no
+    return WillPopScope( // 🔥 Captura el botón de retroceso del sistema
+      onWillPop: _handleExit,
+      child: Scaffold(
+        backgroundColor: Colors.black, // 🔥 Fondo negro moderno
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Sala: $roomId"),
+              if (isTurnDefined) // 🔥 Solo mostrar cuando se defina el turno
+                AnimatedSwitcher(
+                  duration: Duration(milliseconds: 300),
+                  child: Text(
+                    isMyTurn ? "Tu turno" : "Turno del oponente",
+                    key: ValueKey(turnUsername), // 🔥 Cambio animado en AppBar
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isMyTurn ? Colors.blue : Colors
+                          .red, // 🔥 Azul si es tu turno, rojo si no
+                    ),
                   ),
                 ),
+            ],
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () async {
+              await _handleExit();
+            },
+          ),
+        ),
+        body: Column(
+          children: [
+            // 🔥 Nueva fila sticky debajo del AppBar para mostrar el número secreto
+            Container(
+              color: Colors.black,
+              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Tu número secreto: ",
+                    style: TextStyle(fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                  Text(
+                    myNumber,
+                    style: TextStyle(fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue),
+                  ),
+                ],
               ),
+            ),
+
+            Expanded(
+              child: isWaiting
+                  ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 10),
+                  Text("Esperando al otro jugador..."),
+                ],
+              )
+                  : ListView.builder(
+                controller: _scrollController,
+                itemCount: attempts.length,
+                itemBuilder: (context, index) {
+                  final attempt = attempts[index];
+                  bool isMyAttempt = attempt["username"] == username;
+                  int phase = int.parse(attempt["phase"] ?? "1");
+                  int matchingDigits = int.parse(
+                      attempt["matchingDigits"] ?? "0");
+                  int correctPositions = int.parse(
+                      attempt["correctPositions"] ?? "0");
+
+                  return Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                    child: Column(
+                      crossAxisAlignment: isMyAttempt
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isMyAttempt ? "Tú" : attempt["username"]!,
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: isMyAttempt ? Colors.blue : Colors.grey[800],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.all(10),
+                          constraints: BoxConstraints(maxWidth: 250),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                attempt["guess"]!,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (phase == 1)
+                                Text("✔ Dígitos correctos: $matchingDigits",
+                                    style: TextStyle(color: Colors.white70)),
+                              if (phase == 2)
+                                Text(
+                                    "📍 Posiciones correctas: $correctPositions",
+                                    style: TextStyle(
+                                        color: Colors.orangeAccent)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // 🔥 Input y botón de envío modernizados
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                // 🔥 Asegura alineación vertical con el input
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      enabled: isMyTurn,
+                      style: TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: isMyTurn ? Colors.grey[900] : Colors
+                            .grey[800],
+                        hintText: isMyTurn
+                            ? "Introduce un número..."
+                            : "Esperando turno...",
+                        hintStyle: TextStyle(
+                            color: isMyTurn ? Colors.white70 : Colors.grey),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(vertical: 14,
+                            horizontal: 20), // 🔥 Centra texto en input
+                      ),
+                      onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Container(
+                    margin: EdgeInsets.only(bottom: 20),
+                    // 🔥 Agrega margen inferior al icono
+                    child: IconButton(
+                      icon: Icon(Icons.send,
+                          color: isMyTurn ? Colors.blue : Colors.grey),
+                      onPressed: isMyTurn ? _sendGuess : null,
+                      iconSize: 28, // 🔥 Ajuste del tamaño del icono
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          // 🔥 Nueva fila sticky debajo del AppBar para mostrar el número secreto
-          Container(
-            color: Colors.black,
-            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Tu número secreto: ",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                Text(
-                  myNumber,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: isWaiting
-                ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 10),
-                Text("Esperando al otro jugador..."),
-              ],
-            )
-                : ListView.builder(
-              controller: _scrollController,
-              itemCount: attempts.length,
-              itemBuilder: (context, index) {
-                final attempt = attempts[index];
-                bool isMyAttempt = attempt["username"] == username;
-                int phase = int.parse(attempt["phase"] ?? "1");
-                int matchingDigits = int.parse(attempt["matchingDigits"] ?? "0");
-                int correctPositions = int.parse(attempt["correctPositions"] ?? "0");
-
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                  child: Column(
-                    crossAxisAlignment: isMyAttempt
-                        ? CrossAxisAlignment.end
-                        : CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isMyAttempt ? "Tú" : attempt["username"]!,
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isMyAttempt ? Colors.blue : Colors.grey[800],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: EdgeInsets.all(10),
-                        constraints: BoxConstraints(maxWidth: 250),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              attempt["guess"]!,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (phase == 1)
-                              Text("✔ Dígitos correctos: $matchingDigits",
-                                  style: TextStyle(color: Colors.white70)),
-                            if (phase == 2)
-                              Text("📍 Posiciones correctas: $correctPositions",
-                                  style: TextStyle(color: Colors.orangeAccent)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // 🔥 Input y botón de envío modernizados
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center, // 🔥 Asegura alineación vertical con el input
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    enabled: isMyTurn,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: isMyTurn ? Colors.grey[900] : Colors.grey[800],
-                      hintText: isMyTurn ? "Introduce un número..." : "Esperando turno...",
-                      hintStyle: TextStyle(color: isMyTurn ? Colors.white70 : Colors.grey),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 20), // 🔥 Centra texto en input
-                    ),
-                    onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Container(
-                  margin: EdgeInsets.only(bottom: 20), // 🔥 Agrega margen inferior al icono
-                  child: IconButton(
-                    icon: Icon(Icons.send, color: isMyTurn ? Colors.blue : Colors.grey),
-                    onPressed: isMyTurn ? _sendGuess : null,
-                    iconSize: 28, // 🔥 Ajuste del tamaño del icono
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-        ],
       ),
     );
   }
