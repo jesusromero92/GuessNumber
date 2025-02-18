@@ -118,6 +118,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
   bool isWaiting = true;
   final ScrollController _scrollController = ScrollController();
   String myNumber = "Cargando..."; // 🔥 Tu número secreto
+  String turnUsername = ""; // 🔥 Nuevo: Guarda el usuario del turno actual
 
 
   @override
@@ -167,35 +168,35 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                 TextButton(
                   onPressed: () async {
                     await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
-
-                    // 🔥 Cerrar WebSocket antes de salir
                     _channel?.sink.close();
                     _channel = null;
-
-                    // 🔥 Resetear estado
                     setState(() {
                       attempts.clear();
                       isWaiting = true;
                     });
 
-                    Navigator.pop(context); // Cerrar diálogo
-                    Navigator.pop(context); // Volver al menú principal
+                    Navigator.pop(context);
+                    Navigator.pop(context);
                   },
                   child: Text("Aceptar"),
                 ),
               ],
             ),
           );
+        } else if (data["type"] == "turn") {
+          // 🔥 Asegurar que el servidor envía el campo correcto (puede ser "turn" en lugar de "turnUsername")
+          setState(() {
+            turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
+          });
         }
       } catch (e) {
         print("❌ Error al decodificar mensaje: $e");
       }
     });
 
-
-
     _checkPlayersInRoom();
   }
+
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
@@ -265,9 +266,30 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMyTurn = turnUsername == username; // 🔥 Verifica si es tu turno
+
     return Scaffold(
       backgroundColor: Colors.black, // 🔥 Fondo negro moderno
-      appBar: AppBar(title: Text("Sala: $roomId")),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Sala: $roomId"),
+            AnimatedSwitcher(
+              duration: Duration(milliseconds: 300),
+              child: Text(
+                isMyTurn ? "Tu turno" : "Turno del oponente",
+                key: ValueKey(turnUsername), // 🔥 Cambio animado en AppBar
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isMyTurn ? Colors.blue : Colors.red, // 🔥 Azul si es tu turno, rojo si no
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           // 🔥 Nueva fila sticky debajo del AppBar para mostrar el número secreto
@@ -279,7 +301,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
               children: [
                 Text(
                   "Tu número secreto: ",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 Text(
                   myNumber,
