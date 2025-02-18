@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:adivinar_numeros2/winner_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
@@ -51,41 +52,18 @@ class _GameScreenState extends State<GameScreenGame> {
           _scrollToBottom();
         } else if (data["type"] == "game_won") {
           _gameEnded = true;
-          setState(() {
-            attempts.add({
-              "username": "Sistema",
-              "guess": data["message"]
-            });
-          });
-          _scrollToBottom();
-
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text("¡Juego terminado!"),
-              content: Text(data["message"]),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    await http.delete(Uri.parse(
-                        'http://109.123.248.19:4000/api/rooms/$roomId'));
-                    _channel?.sink.close();
-                    _channel = null;
-                    setState(() {
-                      attempts.clear();
-                      isWaiting = true;
-                    });
-
-                    if (mounted) {
-                      Navigator.pop(context);
-                      Navigator.pushReplacementNamed(context, '/');
-                    }
-                  },
-                  child: Text("Aceptar"),
+          String winner = data["winner"] ?? "Jugador Desconocido"; // 🔥 Si es null, usa un valor predeterminado
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => WinnerScreen(
+                  winnerUsername: data["winner"] ?? "Jugador Desconocido",
+                  guessedNumber: data["guessedNumber"] ?? "Numero Desconocido", // ✅ Nuevo: número adivinado
                 ),
-              ],
-            ),
-          );
+              ),
+            );
+          }
         } else if (data["type"] == "turn") {
           setState(() {
             turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
