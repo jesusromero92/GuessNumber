@@ -130,11 +130,13 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
         if (data["type"] == "attempt") {
           setState(() {
-            attempts.add({ // 🔥 Ahora los mensajes nuevos se agregan al final
+            attempts.add({ // 🔥 Se agrega el intento al final de la lista
               "username": data["username"] ?? "Desconocido",
-              "guess": data["guess"]?.toString() ?? "???"
+              "guess": data["guess"]?.toString() ?? "???",
+              "correctPositions": data["correctPositions"]?.toString() ?? "0", // 🔥 Se añade la cantidad de posiciones correctas
             });
           });
+          _scrollToBottom(); // 🔥 Asegurar que el chat siempre haga scroll hacia abajo
         } else if (data["type"] == "game_won") {
           // 🔥 Añadir mensaje de ganador al chat
           setState(() {
@@ -148,30 +150,30 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
           // 🔥 Mostrar alerta emergente y volver al menú
           showDialog(
             context: context,
-            builder: (context) =>
-                AlertDialog(
-                  title: Text("¡Juego terminado!"),
-                  content: Text(data["message"]),
-                  actions: [
-                    TextButton(
-                      onPressed: () async {
-                        // 🔥 Eliminar la sala en el cliente antes de salir
-                        await http.delete(Uri.parse(
-                            'http://109.123.248.19:4000/api/rooms/$roomId'));
+            builder: (context) => AlertDialog(
+              title: Text("¡Juego terminado!"),
+              content: Text(data["message"]),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    // 🔥 Eliminar la sala en el cliente antes de salir
+                    await http.delete(Uri.parse(
+                        'http://109.123.248.19:4000/api/rooms/$roomId'));
 
-                        Navigator.pop(context);
-                        Navigator.pop(context); // Vuelve al menú principal
-                      },
-                      child: Text("Aceptar"),
-                    ),
-                  ],
+                    Navigator.pop(context);
+                    Navigator.pop(context); // Vuelve al menú principal
+                  },
+                  child: Text("Aceptar"),
                 ),
+              ],
+            ),
           );
         }
       } catch (e) {
         print("❌ Error al decodificar mensaje: $e");
       }
     });
+
 
     _checkPlayersInRoom();
   }
@@ -240,17 +242,16 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
               ],
             )
                 : SingleChildScrollView(
-              controller: _scrollController,
               child: Column(
                 children: [
                   ListView.builder(
-                    controller: _scrollController,
                     shrinkWrap: true,
                     physics: NeverScrollableScrollPhysics(),
                     itemCount: attempts.length,
                     itemBuilder: (context, index) {
                       final attempt = attempts[index];
                       bool isMyAttempt = attempt["username"] == username;
+
                       return Align(
                         alignment: isMyAttempt
                             ? Alignment.centerRight
@@ -261,7 +262,8 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                           margin: EdgeInsets.symmetric(
                               vertical: 5, horizontal: 10),
                           decoration: BoxDecoration(
-                            color: isMyAttempt ? Colors.blue : Colors.grey[300],
+                            color:
+                            isMyAttempt ? Colors.blue : Colors.grey[300],
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -273,18 +275,32 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                                 isMyAttempt ? "Tú" : attempt["username"]!,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: isMyAttempt ? Colors.white : Colors
-                                      .black87,
+                                  color: isMyAttempt
+                                      ? Colors.white
+                                      : Colors.black87,
                                 ),
                               ),
                               SizedBox(height: 4),
                               Text(
                                 attempt["guess"]!,
                                 style: TextStyle(
-                                  color: isMyAttempt ? Colors.white : Colors
-                                      .black87,
+                                  color: isMyAttempt
+                                      ? Colors.white
+                                      : Colors.black87,
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              // 🔥 Mostrar posiciones correctas en la misma viñeta
+                              Text(
+                                "Posiciones correctas: ${attempt['correctPositions'] ??
+                                    0}",
+                                style: TextStyle(
+                                  color: isMyAttempt
+                                      ? Colors.white70
+                                      : Colors.black54,
+                                  fontSize: 14,
                                 ),
                               ),
                             ],
