@@ -21,6 +21,7 @@ class _GameScreenState extends State<GameScreenGame> {
   String turnUsername = "";
   bool isTurnDefined = false;
   bool _gameEnded = false;
+  bool hasExited = false; // ✅ Nueva variable para detectar si el usuario salió
 
   @override
   void didChangeDependencies() {
@@ -92,11 +93,18 @@ class _GameScreenState extends State<GameScreenGame> {
           });
         } else if (data["type"] == "player_left") {
           if (!_gameEnded) {
-            if (mounted) {
-              Navigator.of(context).pushReplacementNamed(
-                '/',
-                arguments: {"snackbarMessage": "${data['username']} ha abandonado la sala."},
-              );
+            if (!hasExited) { // ✅ Solo el jugador que NO abandonó ve el mensaje
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed(
+                  '/',
+                  arguments: {"snackbarMessage": "El oponente ha abandonado la sala."},
+                );
+              }
+            } else {
+              // ✅ Si el jugador abandonó, simplemente vuelve sin Snackbar
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/');
+              }
             }
           }
         }
@@ -153,9 +161,13 @@ class _GameScreenState extends State<GameScreenGame> {
     super.dispose();
   }
 
-  Future<bool> _handleExit() async {
+  // ✅ Función para manejar la salida del usuario
+  Future<void> _exitGame() async {
+    hasExited = true; // ✅ Marcar que este usuario salió voluntariamente
+
     try {
-      await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+      await http.delete(
+          Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
 
       _channel?.sink.add(jsonEncode({
         "type": "player_left",
@@ -166,10 +178,33 @@ class _GameScreenState extends State<GameScreenGame> {
       _channel = null;
 
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed(
-          '/',
-          arguments: {"snackbarMessage": "Un jugador se ha desconectado de la sala."},
-        );
+        Navigator.pop(context);
+        Navigator.pushReplacementNamed(context, '/');
+      }
+    } catch (e) {
+      print("❌ Error al salir de la sala: $e");
+    }
+  }
+
+
+// ✅ Método para manejar salida voluntaria
+  Future<bool> _handleExit() async {
+    hasExited = true; // 🔥 Marcar que este jugador salió voluntariamente
+
+    try {
+      await http.delete(
+          Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+
+      _channel?.sink.add(jsonEncode({
+        "type": "player_left",
+        "username": username
+      }));
+
+      _channel?.sink.close();
+      _channel = null;
+
+      if (mounted) {
+        Navigator.pop(context); // 🔥 Regresar a MainScreen SIN Snackbar
       }
     } catch (e) {
       print("❌ Error al salir de la sala: $e");
