@@ -155,8 +155,7 @@ class _GameScreenState extends State<GameScreenGame> {
 
   Future<bool> _handleExit() async {
     try {
-      await http.delete(
-          Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+      await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
 
       _channel?.sink.add(jsonEncode({
         "type": "player_left",
@@ -167,7 +166,10 @@ class _GameScreenState extends State<GameScreenGame> {
       _channel = null;
 
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.of(context).pushReplacementNamed(
+          '/',
+          arguments: {"snackbarMessage": "Un jugador se ha desconectado de la sala."},
+        );
       }
     } catch (e) {
       print("❌ Error al salir de la sala: $e");
@@ -175,6 +177,7 @@ class _GameScreenState extends State<GameScreenGame> {
 
     return Future.value(true);
   }
+
 
   // 🔥 Nueva función para obtener tu número secreto
   Future<void> _fetchMyNumber() async {

@@ -42,27 +42,27 @@ class _MainScreenState extends State<MainScreen> {
   bool _snackbarShown = false; // 🔥 Nueva variable de estado para evitar mensajes repetidos
   String? _snackbarMessage; // 🔥 Variable para manejar el mensaje de abandono sin repetirlo
 
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // 🔥 Capturar el mensaje de abandono solo una vez y luego eliminarlo
     final args = ModalRoute.of(context)?.settings.arguments as Map?;
-    if (args != null && args.containsKey("snackbarMessage") && _snackbarMessage == null) {
-      setState(() {
-        _snackbarMessage = args["snackbarMessage"];
+
+    if (args != null && args.containsKey("snackbarMessage") && !_snackbarShown) {
+      _snackbarShown = true; // 🔥 Marcar que el SnackBar ya se mostró
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) { // 🔥 Asegurar que el widget sigue montado
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(args["snackbarMessage"])),
+          );
+        }
       });
 
-      // 🔥 Mostrar el mensaje solo una vez
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_snackbarMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_snackbarMessage!)),
-          );
-          setState(() {
-            _snackbarMessage = null; // ✅ Evitar que se muestre más de una vez
-          });
+      // 🔥 Eliminar los argumentos después de mostrar el mensaje
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (mounted) {
+          ModalRoute.of(context)?.setState(() {});
         }
       });
     }
