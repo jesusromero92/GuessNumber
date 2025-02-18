@@ -292,75 +292,89 @@ class _GameScreenState extends State<GameScreenGame> {
                   Text("Esperando al otro jugador..."),
                 ],
               )
-                  : ListView.builder(
-                controller: _scrollController,
-                itemCount: attempts.length,
-                itemBuilder: (context, index) {
-                  final attempt = attempts[index];
-                  bool isMyAttempt = attempt["username"] == username;
-                  int phase = int.parse(attempt["phase"] ?? "1");
-                  int matchingDigits = int.parse(
-                      attempt["matchingDigits"] ?? "0");
-                  int correctPositions = int.parse(
-                      attempt["correctPositions"] ?? "0");
+                  : SingleChildScrollView(
+                reverse: true, // ✅ Hace que el último mensaje quede abajo
+                child: Column(
+                  children: [
+                    ListView.builder(
+                      controller: _scrollController,
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: attempts.length,
+                      itemBuilder: (context, index) {
+                        final attempt = attempts[index];
+                        bool isMyAttempt = attempt["username"] == username;
+                        int phase = int.parse(attempt["phase"] ?? "1");
+                        int matchingDigits = int.parse(
+                            attempt["matchingDigits"] ?? "0");
+                        int correctPositions = int.parse(
+                            attempt["correctPositions"] ?? "0");
 
-                  return Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                    child: Column(
-                      crossAxisAlignment: isMyAttempt
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isMyAttempt ? "Tú" : attempt["username"]!,
-                          style: TextStyle(
-                            fontStyle: FontStyle.italic,
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: isMyAttempt ? Colors.blue : Colors.grey[800],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: EdgeInsets.all(10),
-                          constraints: BoxConstraints(maxWidth: 250),
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: isMyAttempt
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
                             children: [
                               Text(
-                                attempt["guess"]!,
+                                isMyAttempt ? "Tú" : attempt["username"]!,
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.white70,
+                                  fontSize: 14,
                                 ),
                               ),
-                              if (phase == 1)
-                                Text("✔ Dígitos correctos: $matchingDigits",
-                                    style: TextStyle(color: Colors.white70)),
-                              if (phase == 2)
-                                Text(
-                                    "📍 Posiciones correctas: $correctPositions",
-                                    style: TextStyle(
-                                        color: Colors.orangeAccent)),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: isMyAttempt ? Colors.blue : Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: EdgeInsets.all(10),
+                                constraints: BoxConstraints(maxWidth: 250),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      attempt["guess"]!,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (phase == 1)
+                                      Text("✔ Dígitos correctos: $matchingDigits",
+                                          style: TextStyle(color: Colors.white70)),
+                                    if (phase == 2)
+                                      Text(
+                                          "📍 Posiciones correctas: $correctPositions",
+                                          style: TextStyle(
+                                              color: Colors.orangeAccent)),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
             ),
 
+
             // 🔥 Input y botón de envío modernizados
-            Padding(
-              padding: const EdgeInsets.all(12.0),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border(
+                  top: BorderSide(color: Colors.white12, width: 1),
+                ),
+              ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                // 🔥 Asegura alineación vertical con el input
                 children: [
                   Expanded(
                     child: TextField(
@@ -371,32 +385,23 @@ class _GameScreenState extends State<GameScreenGame> {
                       style: TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: isMyTurn ? Colors.grey[900] : Colors
-                            .grey[800],
-                        hintText: isMyTurn
-                            ? "Introduce un número..."
-                            : "Esperando turno...",
-                        hintStyle: TextStyle(
-                            color: isMyTurn ? Colors.white70 : Colors.grey),
+                        fillColor: Colors.grey[900],
+                        hintText: isMyTurn ? "Introduce un número..." : "Esperando turno...",
+                        hintStyle: TextStyle(color: Colors.white70),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
                         ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 14,
-                            horizontal: 20), // 🔥 Centra texto en input
+                        contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                       ),
                       onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
                     ),
                   ),
                   SizedBox(width: 8),
-                  Container(
-                    margin: EdgeInsets.only(bottom: 20),
-                    // 🔥 Agrega margen inferior al icono
-                    child: IconButton(
-                      icon: Icon(Icons.send,
-                          color: isMyTurn ? Colors.blue : Colors.grey),
-                      onPressed: isMyTurn ? _sendGuess : null,
-                      iconSize: 28, // 🔥 Ajuste del tamaño del icono
-                    ),
+                  IconButton(
+                    icon: Icon(Icons.send, color: isMyTurn ? Colors.blue : Colors.grey),
+                    onPressed: isMyTurn ? _sendGuess : null,
+                    iconSize: 28,
                   ),
                 ],
               ),
