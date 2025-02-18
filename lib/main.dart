@@ -157,8 +157,19 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                 TextButton(
                   onPressed: () async {
                     await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
-                    Navigator.pop(context);
-                    Navigator.pop(context);
+
+                    // 🔥 Cerrar WebSocket antes de salir
+                    _channel?.sink.close();
+                    _channel = null;
+
+                    // 🔥 Resetear estado
+                    setState(() {
+                      attempts.clear();
+                      isWaiting = true;
+                    });
+
+                    Navigator.pop(context); // Cerrar diálogo
+                    Navigator.pop(context); // Volver al menú principal
                   },
                   child: Text("Aceptar"),
                 ),
@@ -254,87 +265,89 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                       int matchingDigits = int.parse(attempt["matchingDigits"] ?? "0"); // Dígitos correctos
                       int correctPositions = int.parse(attempt["correctPositions"] ?? "0"); // Posiciones correctas
 
-                      return Align(
-                        alignment: isMyAttempt ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                          margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                          decoration: BoxDecoration(
-                            color: isMyAttempt ? Colors.blue : Colors.grey[300],
-                            borderRadius: BorderRadius.circular(12),
+                      return Column(
+                        crossAxisAlignment: isMyAttempt ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          // 🔥 Nombre del jugador al borde de la pantalla en cursiva
+                          Padding(
+                            padding: EdgeInsets.only(
+                              left: isMyAttempt ? 0 : 10,
+                              right: isMyAttempt ? 10 : 0,
+                            ),
+                            child: Text(
+                              isMyAttempt ? "Tú" : attempt["username"]!,
+                              style: TextStyle(
+                                fontStyle: FontStyle.italic, // 🔥 Texto en cursiva
+                                color: Colors.black87,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: isMyAttempt
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isMyAttempt ? "Tú" : attempt["username"]!,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isMyAttempt ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                              SizedBox(height: 4),
 
-                              // 🔥 Número ingresado
-                              Text(
-                                attempt["guess"]!,
-                                style: TextStyle(
-                                  color: isMyAttempt ? Colors.white : Colors.black87,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          // 🔥 Viñeta con número y dígitos correctos (alineado a la izquierda)
+                          Align(
+                            alignment: isMyAttempt ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Container(
+                              width: MediaQuery.of(context).size.width * 0.6, // 🔥 Máximo 60% del ancho de pantalla
+                              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                              margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: isMyAttempt ? Colors.blue : Colors.grey[300],
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              SizedBox(height: 4),
-
-                              // 🔥 Mostrar fase del usuario
-                              Text(
-                                "Fase: ${phase == 1 ? "Dígitos Correctos" : "Posiciones Correctas"}",
-                                style: TextStyle(
-                                  color: isMyAttempt ? Colors.white70 : Colors.black54,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-
-                              // 🔥 Viñeta para la fase 1 (Dígitos correctos)
-                              if (phase == 1)
-                                Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Colors.green, size: 18),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      "Dígitos correctos: $matchingDigits",
-                                      style: TextStyle(
-                                        color: isMyAttempt ? Colors.white70 : Colors.black54,
-                                        fontSize: 14,
-                                      ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start, // 🔥 Alinear texto a la izquierda
+                                children: [
+                                  // 🔥 Número ingresado
+                                  Text(
+                                    attempt["guess"]!,
+                                    style: TextStyle(
+                                      color: isMyAttempt ? Colors.white : Colors.black87,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  SizedBox(height: 4),
 
-                              // 🔥 Viñeta para la fase 2 (Posiciones correctas)
-                              if (phase == 2)
-                                Row(
-                                  children: [
-                                    Icon(Icons.location_on, color: Colors.orange, size: 18),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      "Posiciones correctas: $correctPositions",
-                                      style: TextStyle(
-                                        color: isMyAttempt ? Colors.white70 : Colors.black54,
-                                        fontSize: 14,
-                                      ),
+                                  // 🔥 Mostrar dígitos correctos o posiciones correctas
+                                  if (phase == 1)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                        SizedBox(width: 5),
+                                        Text(
+                                          "Dígitos correctos: $matchingDigits",
+                                          style: TextStyle(
+                                            color: isMyAttempt ? Colors.white70 : Colors.black54,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                            ],
+
+                                  if (phase == 2)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.location_on, color: Colors.orange, size: 18),
+                                        SizedBox(width: 5),
+                                        Text(
+                                          "Posiciones correctas: $correctPositions",
+                                          style: TextStyle(
+                                            color: isMyAttempt ? Colors.white70 : Colors.black54,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       );
                     },
                   ),
+
                 ],
               ),
 
