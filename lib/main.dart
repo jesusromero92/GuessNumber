@@ -54,7 +54,8 @@ class MainScreen extends StatelessWidget {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
-                if (_nameController.text.isNotEmpty && _roomController.text.isNotEmpty) {
+                if (_nameController.text.isNotEmpty &&
+                    _roomController.text.isNotEmpty) {
                   await createRoom(_roomController.text, _nameController.text);
 
                   Navigator.pushNamed(
@@ -73,7 +74,6 @@ class MainScreen extends StatelessWidget {
               },
               child: Text("Crear Sala"),
             ),
-
           ],
         ),
       ),
@@ -81,8 +81,7 @@ class MainScreen extends StatelessWidget {
   }
 }
 
-
-// Método para crear una sala y guardar el usuario en la base de datos
+// Método para crear una sala
 Future<void> createRoom(String roomId, String username) async {
   final response = await http.post(
     Uri.parse('http://109.123.248.19:4000/create-room'),
@@ -97,8 +96,6 @@ Future<void> createRoom(String roomId, String username) async {
   }
 }
 
-
-
 class NumberGuessGame extends StatefulWidget {
   @override
   _NumberGuessGameState createState() => _NumberGuessGameState();
@@ -107,22 +104,18 @@ class NumberGuessGame extends StatefulWidget {
 class _NumberGuessGameState extends State<NumberGuessGame> {
   final TextEditingController _controller = TextEditingController();
   WebSocketChannel? _channel;
-  List<String> attempts = [];
+  List<Map<String, String>> attempts = [];
   String username = "";
   String roomId = "";
-  bool isWaiting = true; // Estado para esperar al segundo jugador
-  bool gameOver = false; // ✅ Se agrega esta variable
-  String winnerMessage = ""; // ✅ Se agrega esta variable
+  bool isWaiting = true;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute
-        .of(context)!
-        .settings
-        .arguments as Map;
+    final args = ModalRoute.of(context)!.settings.arguments as Map;
     username = args['username'];
     roomId = args['roomId'];
+
     _channel = IOWebSocketChannel.connect('ws://109.123.248.19:4000/ws/rooms/$roomId');
 
     _channel!.stream.listen((message) {
@@ -131,10 +124,40 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
         if (data["type"] == "attempt") {
           setState(() {
-            attempts.add(data["message"]);
+            attempts.insert(0, { // 🔥 Ahora los mensajes van de arriba hacia abajo
+              "username": data["username"] ?? "Desconocido",
+              "guess": data["guess"]?.toString() ?? "???"
+            });
           });
-        } else if (data["type"] == "players_count") {
-          print("👥 Jugadores en la sala: ${data["count"]}");
+        } else if (data["type"] == "game_won") {
+          // 🔥 Añadir mensaje de ganador al chat
+          setState(() {
+            attempts.insert(0, {
+              "username": "Sistema",
+              "guess": data["message"]
+            });
+          });
+
+          // 🔥 Mostrar alerta emergente y volver al menú
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text("¡Juego terminado!"),
+              content: Text(data["message"]),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    // 🔥 Eliminar la sala en el cliente antes de salir
+                    await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+
+                    Navigator.pop(context);
+                    Navigator.pop(context); // Vuelve al menú principal
+                  },
+                  child: Text("Aceptar"),
+                ),
+              ],
+            ),
+          );
         }
       } catch (e) {
         print("❌ Error al decodificar mensaje: $e");
@@ -144,7 +167,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
 
 
-    // Verificar si hay otro jugador
+
     _checkPlayersInRoom();
   }
 
@@ -163,16 +186,17 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
           return;
         }
       }
-
-      // Espera 2 segundos antes de volver a verificar
       await Future.delayed(Duration(seconds: 2));
     }
   }
 
   void _sendGuess() {
     if (_controller.text.length == 4) {
-      _channel!.sink.add(
-          jsonEncode({'username': username, 'guess': _controller.text}));
+      _channel!.sink.add(jsonEncode({
+        'username': username,
+        'guess': _controller.text,
+        'type': 'attempt'
+      }));
       _controller.clear();
     }
   }
@@ -187,57 +211,94 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Sala: $roomId")),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          // ✅ Evita el error de expansión infinita
-          children: [
-            Text("Jugador: $username"),
-
-            if (isWaiting)
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                // ✅ Esto evita problemas dentro de otro Column
-                children: [
-                  SizedBox(height: 20),
-                  CircularProgressIndicator(),
-                  SizedBox(height: 10),
-                  Text("Esperando al otro jugador..."),
-                ],
-              )
-            else
-              Expanded( // ✅ Esto permite que la lista de intentos no cause problemas
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _controller,
-                      keyboardType: TextInputType.number,
-                      maxLength: 4,
-                      decoration: InputDecoration(
-                          labelText: "Ingresa un número de 4 cifras"),
+      body: Column(
+        children: [
+          Text("Jugador: $username", style: TextStyle(fontSize: 18)),
+          Expanded(
+            child: isWaiting
+                ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 10),
+                Text("Esperando al otro jugador..."),
+              ],
+            )
+                : ListView.builder(
+              reverse: false, // Mensajes más recientes abajo
+              itemCount: attempts.length,
+              itemBuilder: (context, index) {
+                final attempt = attempts[index];
+                bool isMyAttempt = attempt["username"] == username;
+                return Align(
+                  alignment: isMyAttempt
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 14),
+                    margin:
+                    EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: isMyAttempt ? Colors.blue : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    SizedBox(height: 10),
-                    ElevatedButton(
-                      onPressed: _sendGuess,
-                      child: Text("Enviar"),
+                    child: Column(
+                      crossAxisAlignment: isMyAttempt
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isMyAttempt ? "Tú" : attempt["username"]!,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isMyAttempt
+                                ? Colors.white
+                                : Colors.black87,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          attempt["guess"]!,
+                          style: TextStyle(
+                            color: isMyAttempt
+                                ? Colors.white
+                                : Colors.black87,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 20),
-                    Text("Intentos del oponente:"),
-                    Expanded( // ✅ Agregar Expanded para la lista
-                      child: ListView.builder(
-                        itemCount: attempts.length,
-                        itemBuilder: (context, index) =>
-                            ListTile(
-                              title: Text(attempts[index]),
-                            ),
-                      ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    decoration: InputDecoration(
+                      labelText: "Ingresa un número de 4 cifras",
+                      border: OutlineInputBorder(),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: _sendGuess,
+                  child: Text("Enviar"),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
