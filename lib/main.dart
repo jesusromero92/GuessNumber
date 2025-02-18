@@ -4,6 +4,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:adivinar_numeros2/game_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(MyApp());
@@ -39,27 +40,48 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _roomController = TextEditingController();
-  bool _snackbarShown = false; // 🔥 Nueva variable de estado para evitar mensajes repetidos
-  String? _snackbarMessage; // 🔥 Variable para manejar el mensaje de abandono sin repetirlo
+  bool _snackbarShown = false;
+  String? _snackbarMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastSession(); // 🔥 Cargar última sesión guardada
+  }
+
+  // 🔥 Cargar los datos guardados en SharedPreferences
+  Future<void> _loadLastSession() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _nameController.text = prefs.getString("lastUsername") ?? "";
+      _roomController.text = prefs.getString("lastRoomId") ?? "";
+    });
+  }
+
+  // 🔥 Guardar el último usuario e ID de sala antes de navegar
+  Future<void> _saveLastSession(String username, String roomId) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString("lastUsername", username);
+    await prefs.setString("lastRoomId", roomId);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
     final args = ModalRoute.of(context)?.settings.arguments as Map?;
 
     if (args != null && args.containsKey("snackbarMessage") && !_snackbarShown) {
-      _snackbarShown = true; // 🔥 Marcar que el SnackBar ya se mostró
+      _snackbarShown = true;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) { // 🔥 Asegurar que el widget sigue montado
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(args["snackbarMessage"])),
           );
         }
       });
 
-      // 🔥 Eliminar los argumentos después de mostrar el mensaje
+      // 🔥 Limpiar argumentos después de mostrar el mensaje
       Future.delayed(Duration(milliseconds: 100), () {
         if (mounted) {
           ModalRoute.of(context)?.setState(() {});
@@ -70,27 +92,14 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute
-          .of(context)
-          ?.settings
-          .arguments as Map?;
-      if (args != null && args.containsKey("message")) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(args["message"])),
-        );
-      }
-    });
-
     return Scaffold(
       body: Stack(
         children: [
-          // 🔥 Fondo con imagen y opacidad
+          // 🔥 Fondo
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
                 image: AssetImage("assets/background.png"),
-                // Asegúrate de tener esta imagen en assets
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
                     Colors.black.withOpacity(0.6), BlendMode.darken),
@@ -104,25 +113,15 @@ class _MainScreenState extends State<MainScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 🔥 Icono llamativo
-                  Icon(Icons.videogame_asset_rounded, color: Colors.white,
-                      size: 100),
-
+                  Icon(Icons.videogame_asset_rounded, color: Colors.white, size: 100),
                   SizedBox(height: 20),
-
-                  // 🔥 Título principal
                   Text(
                     "¡Adivina el Número!",
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-
                   SizedBox(height: 30),
 
-                  // 🔥 Input para Nombre de Usuario
+                  // 🔥 Input Nombre de Usuario
                   TextField(
                     controller: _nameController,
                     style: TextStyle(color: Colors.white),
@@ -141,7 +140,7 @@ class _MainScreenState extends State<MainScreen> {
 
                   SizedBox(height: 15),
 
-                  // 🔥 Input para ID de la Sala
+                  // 🔥 Input ID de Sala
                   TextField(
                     controller: _roomController,
                     style: TextStyle(color: Colors.white),
@@ -160,13 +159,15 @@ class _MainScreenState extends State<MainScreen> {
 
                   SizedBox(height: 25),
 
-                  // 🔥 Botón Animado con diseño moderno
+                  // 🔥 Botón de Unirse a la Sala
                   ElevatedButton(
                     onPressed: () async {
                       if (_nameController.text.isNotEmpty && _roomController.text.isNotEmpty) {
                         await createRoom(_roomController.text, _nameController.text);
 
-                        // 🔥 Limpiamos cualquier argumento previo antes de navegar al juego
+                        // 🔥 Guardar último usuario e ID de sala
+                        await _saveLastSession(_nameController.text, _roomController.text);
+
                         Navigator.pushNamed(
                           context,
                           '/game',
@@ -186,14 +187,11 @@ class _MainScreenState extends State<MainScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 40, vertical: 15),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       backgroundColor: Colors.blueAccent,
                     ),
-                    child: Text("Unirse a la Sala",
-                        style: TextStyle(fontSize: 18, color: Colors.white)),
+                    child: Text("Unirse a la Sala", style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
                 ],
               ),
@@ -205,7 +203,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// Método para crear una sala
+// 🔥 Método para crear una sala
 Future<void> createRoom(String roomId, String username) async {
   final response = await http.post(
     Uri.parse('http://109.123.248.19:4000/create-room'),
