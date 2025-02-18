@@ -145,15 +145,25 @@ class _GameScreenState extends State<GameScreenGame> {
   }
 
   void _sendGuess() {
-    if (_controller.text.length == 4) {
-      _channel!.sink.add(jsonEncode({
-        'username': username,
-        'guess': _controller.text,
-        'type': 'attempt'
-      }));
-      _controller.clear();
+    String guess = _controller.text;
+
+    // ✅ Verifica que el número tenga 4 dígitos únicos
+    if (guess.length != 4 || guess.split('').toSet().length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ No se pueden repetir cifras en el número.")),
+      );
+      return; // 🔥 No envía el intento si es inválido
     }
+
+    _channel!.sink.add(jsonEncode({
+      'username': username,
+      'guess': guess,
+      'type': 'attempt'
+    }));
+
+    _controller.clear();
   }
+
 
   @override
   void dispose() {
