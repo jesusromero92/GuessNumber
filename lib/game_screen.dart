@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:adivinar_numeros2/winner_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -23,75 +24,210 @@ class _GameScreenState extends State<GameScreenGame> {
   bool isTurnDefined = false;
   bool _gameEnded = false;
   bool hasExited = false; // ✅ Nueva variable para detectar si el usuario salió
+  WebSocketChannel? _emojiChannel; // ✅ Nuevo WebSocket para escuchar emojis
+  // ✅ Nueva lista para animar los emojis flotantes en la pantalla
+  List<String> floatingEmojis = [];
+
+
+  @override
+  void dispose() {
+    _channel?.sink.close();
+    _emojiChannel?.sink.close();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ Conectar WebSocket de emojis una sola vez
+    _emojiChannel =
+        IOWebSocketChannel.connect('ws://109.123.248.19:4001/ws/emojis');
+
+    _emojiChannel!.stream.listen((message) {
+      try {
+        final data = jsonDecode(message);
+        if (data["type"] == "reaction") {
+          _showFloatingEmoji(data["emoji"]);
+        }
+      } catch (e) {
+        print("❌ Error en WebSocket de emojis: $e");
+      }
+    });
+  }
+
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)!.settings.arguments as Map;
+
+    final args = ModalRoute
+        .of(context)!
+        .settings
+        .arguments as Map;
     username = args['username'];
     roomId = args['roomId'];
 
-    _channel =
-        IOWebSocketChannel.connect('ws://109.123.248.19:4000/ws/rooms/$roomId');
-    _fetchMyNumber();
+    if (_channel == null) { // ✅ Evita crear múltiples conexiones
+      _channel = IOWebSocketChannel.connect(
+          'ws://109.123.248.19:4000/ws/rooms/$roomId');
+      _fetchMyNumber();
 
-    _channel!.stream.listen((message) {
-      try {
-        final data = jsonDecode(message);
+      _channel!.stream.listen((message) {
+        try {
+          final data = jsonDecode(message);
 
-        if (data["type"] == "attempt") {
-          setState(() {
-            attempts.add({
-              "username": data["username"] ?? "Desconocido",
-              "guess": data["guess"]?.toString() ?? "???",
-              "matchingDigits": data["matchingDigits"]?.toString() ?? "0",
-              "correctPositions": data["correctPositions"]?.toString() ?? "0",
-              "phase": data["phase"]?.toString() ?? "1",
+          if (data["type"] == "attempt") {
+            setState(() {
+              attempts.add({
+                "username": data["username"] ?? "Desconocido",
+                "guess": data["guess"]?.toString() ?? "???",
+                "matchingDigits": data["matchingDigits"]?.toString() ?? "0",
+                "correctPositions": data["correctPositions"]?.toString() ?? "0",
+                "phase": data["phase"]?.toString() ?? "1",
+              });
             });
-          });
-          _scrollToBottom();
-        } else if (data["type"] == "game_won") {
-          _gameEnded = true;
-          String winner = data["winner"] ?? "Jugador Desconocido"; // 🔥 Si es null, usa un valor predeterminado
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => WinnerScreen(
-                  winnerUsername: data["winner"] ?? "Jugador Desconocido",
-                  guessedNumber: data["guessedNumber"] ?? "Numero Desconocido", // ✅ Nuevo: número adivinado
+            _scrollToBottom();
+          } else if (data["type"] == "game_won") {
+            _gameEnded = true;
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      WinnerScreen(
+                        winnerUsername: data["winner"] ?? "Jugador Desconocido",
+                        guessedNumber: data["guessedNumber"] ??
+                            "Numero Desconocido",
+                      ),
                 ),
-              ),
-            );
-          }
-        } else if (data["type"] == "turn") {
-          setState(() {
-            turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
-            isTurnDefined = true;
-          });
-        } else if (data["type"] == "player_left") {
-          if (!_gameEnded) {
-            if (!hasExited) { // ✅ Solo el jugador que NO abandonó ve el mensaje
-              if (mounted) {
-                Navigator.of(context).pushReplacementNamed(
-                  '/',
-                  arguments: {"snackbarMessage": "El oponente ha abandonado la sala."},
-                );
-              }
-            } else {
-              // ✅ Si el jugador abandonó, simplemente vuelve sin Snackbar
-              if (mounted) {
-                Navigator.of(context).pushReplacementNamed('/');
-              }
+              );
             }
+          } else if (data["type"] == "turn") {
+            setState(() {
+              turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
+              isTurnDefined = true;
+            });
           }
+        } catch (e) {
+          print("❌ Error al decodificar mensaje: $e");
         }
-      } catch (e) {
-        print("❌ Error al decodificar mensaje: $e");
-      }
+      });
+
+      _checkPlayersInRoom();
+    }
+  }
+
+
+  /// 🔥 Muestra un emoticono flotante en el centro por unos segundos
+  void _showFloatingEmoji(String emoji) {
+    setState(() {
+      floatingEmojis.add(emoji);
     });
 
-    _checkPlayersInRoom();
+    // 🔥 Elimina el emoji después de 3 segundos
+    Future.delayed(Duration(seconds: 3), () {
+      setState(() {
+        floatingEmojis.remove(emoji);
+      });
+    });
+  }
+
+  /// 🔥 Construye la animación de los emoticonos en el centro
+  Widget _buildFloatingEmoji(String emoji) {
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1.0, end: 0.0), // Empieza con opacidad 1 y se desvanece
+        duration: Duration(seconds: 3),
+        builder: (context, opacity, child) {
+          return Opacity(
+            opacity: opacity,
+            child: Text(
+              emoji,
+              style: TextStyle(fontSize: 60), // Tamaño más grande para mayor visibilidad
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 🔥 Muestra el modal inferior con más emojis variados
+  void _showEmojiPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              SizedBox(height: 10),
+              Text("Elige un emoji",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              SizedBox(height: 15),
+
+              // 🔥 Emojis organizados en filas
+              Wrap(
+                spacing: 15,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  _emojiButton("😀"), _emojiButton("😂"), _emojiButton("🔥"),
+                  _emojiButton("💩"), _emojiButton("🤡"), _emojiButton("🤔"),
+                  _emojiButton("🙃"), _emojiButton("🥳"), _emojiButton("😭"),
+                  _emojiButton("🤪"), _emojiButton("🤯"), _emojiButton("😡"),
+                  _emojiButton("👍"), _emojiButton("👎"), _emojiButton("✌️"),
+                  _emojiButton("👏"), _emojiButton("🎉"), _emojiButton("🏆"),
+                  _emojiButton("🎯"), _emojiButton("🕶️"), _emojiButton("🏳️‍🌈"),
+                ],
+              ),
+
+              SizedBox(height: 15),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 🔥 Botón de selección de emoji
+  Widget _emojiButton(String emoji) {
+    return GestureDetector(
+      onTap: () {
+        _sendReaction(emoji);
+        Navigator.pop(context);
+      },
+      child: Text(emoji, style: TextStyle(fontSize: 30)),
+    );
+  }
+
+  /// 🔥 Enviar reacción por WebSocket
+  void _sendReaction(String emoji) {
+    if (_emojiChannel == null) {
+      print("❌ Error: WebSocket de emojis no está conectado.");
+      return;
+    }
+
+    _emojiChannel!.sink.add(jsonEncode({
+      "type": "reaction",
+      "emoji": emoji,
+      "username": username,
+      "roomId": roomId,
+    }));
+
+    _showFloatingEmoji(emoji);
   }
 
   void _scrollToBottom() {
@@ -126,7 +262,10 @@ class _GameScreenState extends State<GameScreenGame> {
     String guess = _controller.text;
 
     // ✅ Verifica que el número tenga 4 dígitos únicos
-    if (guess.length != 4 || guess.split('').toSet().length != 4) {
+    if (guess.length != 4 || guess
+        .split('')
+        .toSet()
+        .length != 4) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("❌ No se pueden repetir cifras en el número.")),
       );
@@ -140,38 +279,6 @@ class _GameScreenState extends State<GameScreenGame> {
     }));
 
     _controller.clear();
-  }
-
-
-  @override
-  void dispose() {
-    _channel?.sink.close();
-    super.dispose();
-  }
-
-  // ✅ Función para manejar la salida del usuario
-  Future<void> _exitGame() async {
-    hasExited = true; // ✅ Marcar que este usuario salió voluntariamente
-
-    try {
-      await http.delete(
-          Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
-
-      _channel?.sink.add(jsonEncode({
-        "type": "player_left",
-        "username": username
-      }));
-
-      _channel?.sink.close();
-      _channel = null;
-
-      if (mounted) {
-        Navigator.pop(context);
-        Navigator.pushReplacementNamed(context, '/');
-      }
-    } catch (e) {
-      print("❌ Error al salir de la sala: $e");
-    }
   }
 
 
@@ -223,28 +330,27 @@ class _GameScreenState extends State<GameScreenGame> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMyTurn = turnUsername == username; // 🔥 Verifica si es tu turno
+    bool isMyTurn = turnUsername == username;
 
-    return WillPopScope( // 🔥 Captura el botón de retroceso del sistema
+    return WillPopScope(
       onWillPop: _handleExit,
       child: Scaffold(
-        backgroundColor: Colors.black, // 🔥 Fondo negro moderno
+        backgroundColor: Colors.black,
         appBar: AppBar(
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Sala: $roomId"),
-              if (isTurnDefined) // 🔥 Solo mostrar cuando se defina el turno
+              if (isTurnDefined)
                 AnimatedSwitcher(
                   duration: Duration(milliseconds: 300),
                   child: Text(
                     isMyTurn ? "Tu turno" : "Turno del oponente",
-                    key: ValueKey(turnUsername), // 🔥 Cambio animado en AppBar
+                    key: ValueKey(turnUsername),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: isMyTurn ? Colors.blue : Colors
-                          .red, // 🔥 Azul si es tu turno, rojo si no
+                      color: isMyTurn ? Colors.blue : Colors.red,
                     ),
                   ),
                 ),
@@ -257,159 +363,184 @@ class _GameScreenState extends State<GameScreenGame> {
             },
           ),
         ),
-        body: Column(
+        body: Stack(
           children: [
-            // 🔥 Nueva fila sticky debajo del AppBar para mostrar el número secreto
-            Container(
-              color: Colors.black,
-              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Tu número secreto: ",
-                    style: TextStyle(fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  Text(
-                    myNumber,
-                    style: TextStyle(fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue),
-                  ),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: isWaiting
-                  ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 10),
-                  Text("Esperando al otro jugador..."),
-                ],
-              )
-                  : SingleChildScrollView(
-                reverse: true, // ✅ Hace que el último mensaje quede abajo
-                child: Column(
-                  children: [
-                    ListView.builder(
-                      controller: _scrollController,
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      itemCount: attempts.length,
-                      itemBuilder: (context, index) {
-                        final attempt = attempts[index];
-                        bool isMyAttempt = attempt["username"] == username;
-                        int phase = int.parse(attempt["phase"] ?? "1");
-                        int matchingDigits = int.parse(
-                            attempt["matchingDigits"] ?? "0");
-                        int correctPositions = int.parse(
-                            attempt["correctPositions"] ?? "0");
-
-                        return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                          child: Column(
-                            crossAxisAlignment: isMyAttempt
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                isMyAttempt ? "Tú" : attempt["username"]!,
-                                style: TextStyle(
-                                  fontStyle: FontStyle.italic,
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: isMyAttempt ? Colors.blue : Colors.grey[800],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: EdgeInsets.all(10),
-                                constraints: BoxConstraints(maxWidth: 250),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      attempt["guess"]!,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    if (phase == 1)
-                                      Text("✔ Dígitos correctos: $matchingDigits",
-                                          style: TextStyle(color: Colors.white70)),
-                                    if (phase == 2)
-                                      Text(
-                                          "📍 Posiciones correctas: $correctPositions",
-                                          style: TextStyle(
-                                              color: Colors.orangeAccent)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-
-            // 🔥 Input y botón de envío modernizados
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                border: Border(
-                  top: BorderSide(color: Colors.white12, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      keyboardType: TextInputType.number,
-                      maxLength: 4,
-                      enabled: isMyTurn,
-                      style: TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.grey[900],
-                        hintText: isMyTurn ? "Introduce un número..." : "Esperando turno...",
-                        hintStyle: TextStyle(color: Colors.white70),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            Column(
+              children: [
+                // 🔥 Fila debajo del AppBar para mostrar el número secreto
+                Container(
+                  color: Colors.black,
+                  padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Tu número secreto: ",
+                        style: TextStyle(fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       ),
-                      onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
+                      Text(
+                        myNumber,
+                        style: TextStyle(fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: isWaiting
+                      ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 10),
+                      Text("Esperando al otro jugador..."),
+                    ],
+                  )
+                      : SingleChildScrollView(
+                    reverse: true,
+                    child: Column(
+                      children: [
+                        ListView.builder(
+                          controller: _scrollController,
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          itemCount: attempts.length,
+                          itemBuilder: (context, index) {
+                            final attempt = attempts[index];
+                            bool isMyAttempt = attempt["username"] == username;
+                            int phase = int.parse(attempt["phase"] ?? "1");
+                            int matchingDigits = int.parse(
+                                attempt["matchingDigits"] ?? "0");
+                            int correctPositions = int.parse(
+                                attempt["correctPositions"] ?? "0");
+
+                            return Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 5),
+                              child: Column(
+                                crossAxisAlignment: isMyAttempt
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isMyAttempt ? "Tú" : attempt["username"]!,
+                                    style: TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: isMyAttempt ? Colors.blue : Colors
+                                          .grey[800],
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: EdgeInsets.all(10),
+                                    constraints: BoxConstraints(maxWidth: 250),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment
+                                          .start,
+                                      children: [
+                                        Text(
+                                          attempt["guess"]!,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (phase == 1)
+                                          Text(
+                                              "✔ Dígitos correctos: $matchingDigits",
+                                              style: TextStyle(
+                                                  color: Colors.white70)),
+                                        if (phase == 2)
+                                          Text(
+                                              "📍 Posiciones correctas: $correctPositions",
+                                              style: TextStyle(
+                                                  color: Colors.orangeAccent)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(Icons.send, color: isMyTurn ? Colors.blue : Colors.grey),
-                    onPressed: isMyTurn ? _sendGuess : null,
-                    iconSize: 28,
+                ),
+
+                // ✅ Input fijo en la parte inferior
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    border: Border(
+                      top: BorderSide(color: Colors.white12, width: 1),
+                    ),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      // 🔥 Botón para abrir los emojis
+                      IconButton(
+                        icon: Icon(Icons.emoji_emotions_outlined,
+                            color: Colors.yellowAccent, size: 28),
+                        onPressed: _showEmojiPicker,
+                      ),
+                      SizedBox(width: 8),
+
+                      // ✅ Input de texto
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          keyboardType: TextInputType.number,
+                          maxLength: 4,
+                          enabled: isMyTurn,
+                          style: TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.grey[900],
+                            hintText: isMyTurn
+                                ? "Introduce un número..."
+                                : "Esperando turno...",
+                            hintStyle: TextStyle(color: Colors.white70),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 20),
+                          ),
+                          onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+
+                      // ✅ Botón de enviar intento
+                      IconButton(
+                        icon: Icon(Icons.send,
+                            color: isMyTurn ? Colors.blue : Colors.grey,
+                            size: 28),
+                        onPressed: isMyTurn ? _sendGuess : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+
+            // 🔥 Emojis flotantes que NO afectan el input
+            for (var emoji in floatingEmojis) _buildFloatingEmoji(emoji),
           ],
         ),
       ),
     );
   }
-
 }

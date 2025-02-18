@@ -38,6 +38,7 @@ dependencies:
   http: ^1.3.0
   shared_preferences: ^2.2.0  # Asegúrate de usar la versión más reciente
   lottie: ^2.3.2
+  emoji_picker_flutter: ^4.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
