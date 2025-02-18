@@ -160,29 +160,50 @@ class _MainScreenState extends State<MainScreen> {
                   SizedBox(height: 25),
 
                   // 🔥 Botón de Unirse a la Sala
+                  // 🔥 Botón de Unirse a la Sala con verificación de capacidad
                   ElevatedButton(
                     onPressed: () async {
                       if (_nameController.text.isNotEmpty && _roomController.text.isNotEmpty) {
-                        await createRoom(_roomController.text, _nameController.text);
+                        final response = await http.post(
+                          Uri.parse('http://109.123.248.19:4000/join-room'),
+                          headers: {"Content-Type": "application/json"},
+                          body: jsonEncode({
+                            "roomId": _roomController.text,
+                            "username": _nameController.text
+                          }),
+                        );
 
-                        // 🔥 Guardar último usuario e ID de sala
-                        await _saveLastSession(_nameController.text, _roomController.text);
+                        final responseData = jsonDecode(response.body);
 
-                        Navigator.pushNamed(
-                          context,
-                          '/game',
-                          arguments: {
-                            'username': _nameController.text,
-                            'roomId': _roomController.text,
-                          },
-                        ).then((_) {
-                          setState(() {
-                            _snackbarMessage = null; // ✅ Evitar mensajes al volver a MainScreen
-                          });
-                        });
+                        if (response.statusCode == 403) {
+                          // 🔥 La sala está llena, mostrar mensaje y regresar a MainScreen
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("❌ La sala está llena, intenta otra.")),
+                          );
+                          return;
+                        }
+
+                        if (response.statusCode == 200) {
+                          // 🔥 Guardar usuario y sala antes de entrar
+                          await _saveLastSession(_nameController.text, _roomController.text);
+
+                          Navigator.pushNamed(
+                            context,
+                            '/game',
+                            arguments: {
+                              'username': _nameController.text,
+                              'roomId': _roomController.text,
+                            },
+                          );
+                        } else {
+                          // 🔥 Error inesperado
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("❌ Error al unirse a la sala.")),
+                          );
+                        }
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Por favor, ingresa todos los datos")),
+                          SnackBar(content: Text("❌ Por favor, ingresa todos los datos.")),
                         );
                       }
                     },
@@ -193,6 +214,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     child: Text("Unirse a la Sala", style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
+
                 ],
               ),
             ),

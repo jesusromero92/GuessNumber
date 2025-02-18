@@ -114,7 +114,18 @@ class _GameScreenState extends State<GameScreenGame> {
                 ),
               );
             }
-          } else if (data["type"] == "turn") {
+          }
+          if (data["type"] == "player_left" && !hasExited) {
+            if (mounted) {
+              Navigator.pushReplacementNamed(
+                context,
+                '/',
+                arguments: {"snackbarMessage": "El oponente ha abandonado la sala."},
+              );
+            }
+          }
+
+          else if (data["type"] == "turn") {
             setState(() {
               turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
               isTurnDefined = true;
