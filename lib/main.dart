@@ -109,6 +109,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
   String roomId = "";
   bool isWaiting = true;
   final ScrollController _scrollController = ScrollController();
+  String myNumber = "Cargando..."; // 🔥 Tu número secreto
 
 
   @override
@@ -123,6 +124,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
 
     _channel =
         IOWebSocketChannel.connect('ws://109.123.248.19:4000/ws/rooms/$roomId');
+    _fetchMyNumber(); // 🔥 Obtener mi número secreto
 
     _channel!.stream.listen((message) {
       try {
@@ -234,13 +236,50 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
     super.dispose();
   }
 
+  // 🔥 Nueva función para obtener tu número secreto
+  Future<void> _fetchMyNumber() async {
+    try {
+      final response = await http.get(
+          Uri.parse('http://109.123.248.19:4000/my-number/$roomId/$username'));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          myNumber = data['my_number']?.toString() ?? "Desconocido";
+        });
+      } else {
+        print("❌ Error al obtener mi número: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ Error en la solicitud de mi número: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Sala: $roomId")),
       body: Column(
         children: [
-          Text("Jugador: $username", style: TextStyle(fontSize: 18)),
+          // 🔥 Nueva fila sticky debajo del AppBar para mostrar el número secreto
+          Container(
+            color: Colors.grey[200],
+            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Tu número secreto: ",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  myNumber,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                ),
+              ],
+            ),
+          ),
+
           Expanded(
             child: isWaiting
                 ? Column(
@@ -261,14 +300,15 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                     itemBuilder: (context, index) {
                       final attempt = attempts[index];
                       bool isMyAttempt = attempt["username"] == username;
-                      int phase = int.parse(attempt["phase"] ?? "1"); // Fase del intento
-                      int matchingDigits = int.parse(attempt["matchingDigits"] ?? "0"); // Dígitos correctos
-                      int correctPositions = int.parse(attempt["correctPositions"] ?? "0"); // Posiciones correctas
+                      int phase = int.parse(attempt["phase"] ?? "1");
+                      int matchingDigits = int.parse(attempt["matchingDigits"] ?? "0");
+                      int correctPositions = int.parse(attempt["correctPositions"] ?? "0");
 
                       return Column(
-                        crossAxisAlignment: isMyAttempt ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                        isMyAttempt ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                         children: [
-                          // 🔥 Nombre del jugador al borde de la pantalla en cursiva
+                          // 🔥 Nombre del jugador
                           Padding(
                             padding: EdgeInsets.only(
                               left: isMyAttempt ? 0 : 10,
@@ -277,18 +317,18 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                             child: Text(
                               isMyAttempt ? "Tú" : attempt["username"]!,
                               style: TextStyle(
-                                fontStyle: FontStyle.italic, // 🔥 Texto en cursiva
+                                fontStyle: FontStyle.italic,
                                 color: Colors.black87,
                                 fontSize: 14,
                               ),
                             ),
                           ),
 
-                          // 🔥 Viñeta con número y dígitos correctos (alineado a la izquierda)
+                          // 🔥 Viñeta con número y dígitos correctos
                           Align(
                             alignment: isMyAttempt ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
-                              width: MediaQuery.of(context).size.width * 0.6, // 🔥 Máximo 60% del ancho de pantalla
+                              width: MediaQuery.of(context).size.width * 0.6,
                               padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                               margin: EdgeInsets.symmetric(vertical: 5, horizontal: 10),
                               decoration: BoxDecoration(
@@ -296,7 +336,7 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start, // 🔥 Alinear texto a la izquierda
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // 🔥 Número ingresado
                                   Text(
@@ -347,10 +387,8 @@ class _NumberGuessGameState extends State<NumberGuessGame> {
                       );
                     },
                   ),
-
                 ],
               ),
-
             ),
           ),
           Padding(
