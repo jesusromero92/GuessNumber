@@ -41,9 +41,9 @@ class _GameScreenState extends State<GameScreenGame> {
     super.initState();
 
     // ✅ Conectar WebSocket de emojis una sola vez
-    _emojiChannel =
-        IOWebSocketChannel.connect('ws://109.123.248.19:4001/ws/emojis');
+    _emojiChannel = IOWebSocketChannel.connect('ws://109.123.248.19:4001/ws/emojis');
 
+    // ✅ Escuchar los emojis del oponente
     _emojiChannel!.stream.listen((message) {
       try {
         final data = jsonDecode(message);
@@ -55,6 +55,17 @@ class _GameScreenState extends State<GameScreenGame> {
       }
     });
   }
+
+  void _registerUser() {
+    if (_emojiChannel != null) {
+      _emojiChannel!.sink.add(jsonEncode({
+        "type": "register",
+        "username": username,
+        "roomId": roomId,
+      }));
+    }
+  }
+
 
 
   @override
@@ -115,6 +126,8 @@ class _GameScreenState extends State<GameScreenGame> {
       });
 
       _checkPlayersInRoom();
+      // ✅ Registrar al usuario en WebSocket de emojis
+      _registerUser();
     }
   }
 
