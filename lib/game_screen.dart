@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
-import 'package:adivinar_numeros2/winner_screen.dart';
+import 'package:guess_number/winner_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';

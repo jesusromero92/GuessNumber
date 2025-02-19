@@ -1,4 +1,4 @@
-package com.example.adivinar_numeros2
+package com.example.guess_number
 
 import io.flutter.embedding.android.FlutterActivity
 

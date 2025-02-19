@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
-import 'package:adivinar_numeros2/game_screen.dart';
+import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
