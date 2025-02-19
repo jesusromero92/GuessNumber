@@ -142,40 +142,6 @@ class _GameScreenState extends State<GameScreenGame> {
     }
   }
 
-
-  /// 🔥 Muestra un emoticono flotante en el centro por unos segundos
-  void _showFloatingEmoji(String emoji) {
-    setState(() {
-      floatingEmojis.add(emoji);
-    });
-
-    // 🔥 Elimina el emoji después de 3 segundos
-    Future.delayed(Duration(seconds: 3), () {
-      setState(() {
-        floatingEmojis.remove(emoji);
-      });
-    });
-  }
-
-  /// 🔥 Construye la animación de los emoticonos en el centro
-  Widget _buildFloatingEmoji(String emoji) {
-    return Center(
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 1.0, end: 0.0), // Empieza con opacidad 1 y se desvanece
-        duration: Duration(seconds: 3),
-        builder: (context, opacity, child) {
-          return Opacity(
-            opacity: opacity,
-            child: Text(
-              emoji,
-              style: TextStyle(fontSize: 60), // Tamaño más grande para mayor visibilidad
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   /// 🔥 Muestra el modal inferior con más emojis variados
   void _showEmojiPicker() {
     showModalBottomSheet(
@@ -237,8 +203,9 @@ class _GameScreenState extends State<GameScreenGame> {
     );
   }
 
+
   /// 🔥 Enviar reacción por WebSocket
-  void _sendReaction(String emoji) {
+  void _sendReaction(String emojiMessage) {
     if (_emojiChannel == null) {
       print("❌ Error: WebSocket de emojis no está conectado.");
       return;
@@ -246,15 +213,51 @@ class _GameScreenState extends State<GameScreenGame> {
 
     _emojiChannel!.sink.add(jsonEncode({
       "type": "reaction",
-      "emoji": emoji,
+      "emoji": emojiMessage,
       "username": username,
       "roomId": roomId,
     }));
 
-    _showFloatingEmoji(emoji);
+    _showFloatingEmoji(emojiMessage);
   }
 
-  void _scrollToBottom() {
+  /// 🔥 Muestra un emoticono flotante en el centro con texto más pequeño y saltos de línea
+  void _showFloatingEmoji(String emojiMessage) {
+    setState(() {
+      floatingEmojis.add(emojiMessage);
+    });
+
+    Future.delayed(Duration(seconds: 3), () {
+      setState(() {
+        floatingEmojis.remove(emojiMessage);
+      });
+    });
+  }
+
+  /// 🔥 Construye la animación de los emoticonos con texto pequeño y salto de línea
+  Widget _buildFloatingEmoji(String emojiMessage) {
+    return Center(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1.0, end: 0.0),
+        duration: Duration(seconds: 3),
+        builder: (context, opacity, child) {
+          return Opacity(
+            opacity: opacity,
+            child: Text(
+              emojiMessage,
+              textAlign: TextAlign.center, // ✅ Centra el texto y el emoji
+              style: TextStyle(fontSize: 80, fontWeight: FontWeight.bold), // ✅ Texto más pequeño
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+
+
+
+        void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.minScrollExtent,
