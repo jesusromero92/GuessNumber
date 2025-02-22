@@ -27,6 +27,7 @@ class _GameScreenState extends State<GameScreenGame> {
   WebSocketChannel? _emojiChannel; // ✅ Nuevo WebSocket para escuchar emojis
   // ✅ Nueva lista para animar los emojis flotantes en la pantalla
   List<String> floatingEmojis = [];
+  bool _exitRequested = false; // 🔥 Rastrea si el usuario ya presionó "Volver" una vez
 
 
   @override
@@ -355,12 +356,121 @@ class _GameScreenState extends State<GameScreenGame> {
     }
   }
 
+  Future<bool> _showExitConfirmationDialog() async {
+    return await showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20), // 🔥 Bordes redondeados
+          ),
+          backgroundColor: Colors.black, // 🔥 Fondo oscuro moderno
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 🔥 Ícono de advertencia grande
+                Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 60),
+                SizedBox(height: 10),
+
+                // 🔥 Título llamativo
+                Text(
+                  "¿Seguro que quieres abandonar?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 10),
+
+                // 🔥 Mensaje informativo
+                Text(
+                  "Si sales, la sala será eliminada y tu oponente será expulsado.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white70,
+                  ),
+                ),
+                SizedBox(height: 20),
+
+                // 🔥 Botones modernos con diseño personalizado
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 🔥 Botón de cancelar
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        backgroundColor: Colors.grey[800], // 🔥 Color oscuro
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: Text(
+                        "Cancelar",
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                    ),
+
+                    // 🔥 Botón de confirmar salida
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        backgroundColor: Colors.redAccent, // 🔥 Color llamativo
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.of(context).pop(true);
+                        await _handleExit();
+                      },
+                      child: Text(
+                        "Sí, salir",
+                        style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ) ?? false;
+  }
+
+
   @override
   Widget build(BuildContext context) {
     bool isMyTurn = turnUsername == username;
 
     return WillPopScope(
-      onWillPop: _handleExit,
+      onWillPop: () async {
+        if (_exitRequested) {
+          return await _showExitConfirmationDialog();
+        } else {
+          _exitRequested = true; // 🔥 Marcar que el usuario presionó "Atrás" una vez
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("🔔 Presiona de nuevo para salir."),
+              duration: Duration(seconds: 2),
+            ),
+          );
+
+          // 🔥 Resetear el estado después de 2 segundos
+          Future.delayed(Duration(seconds: 2), () {
+            _exitRequested = false;
+          });
+
+          return Future.value(false); // 🔥 No salir todavía
+        }
+      },
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -386,7 +496,7 @@ class _GameScreenState extends State<GameScreenGame> {
           leading: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () async {
-              await _handleExit();
+              await _showExitConfirmationDialog();
             },
           ),
         ),
