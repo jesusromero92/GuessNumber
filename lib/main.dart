@@ -164,6 +164,7 @@ class _MainScreenState extends State<MainScreen> {
                   SizedBox(height: 30),
 
                   // 🔥 Input Nombre de Usuario
+                  // 🔥 Input Nombre de Usuario con validación
                   TextField(
                     controller: _nameController,
                     style: TextStyle(color: Colors.white),
@@ -178,7 +179,23 @@ class _MainScreenState extends State<MainScreen> {
                         borderSide: BorderSide.none,
                       ),
                     ),
+                    onChanged: (value) {
+                      if (value.contains("?") || value.contains("¿")) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("❌ No se permiten los caracteres '?' o '¿'.")),
+                        );
+
+                        // 🔥 Elimina automáticamente los caracteres inválidos
+                        setState(() {
+                          _nameController.text = value.replaceAll(RegExp(r'[?¿]'), '');
+                          _nameController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: _nameController.text.length),
+                          );
+                        });
+                      }
+                    },
                   ),
+
 
                   SizedBox(height: 15),
 
@@ -204,7 +221,7 @@ class _MainScreenState extends State<MainScreen> {
                   // 🔥 Botón de Unirse a la Sala
                   // 🔥 Botón de Unirse a la Sala con verificación de capacidad
                   ElevatedButton(
-                    onPressed: _isJoining
+                    onPressed: _isJoining || _nameController.text.contains("?") || _nameController.text.contains("¿")
                         ? null
                         : () async {
                       setState(() {
@@ -246,7 +263,7 @@ class _MainScreenState extends State<MainScreen> {
                               SnackBar(content: Text("❌ Error al unirse a la sala.")),
                             );
                           }
-                                                } catch (e) {
+                        } catch (e) {
                           print("❌ Error: $e");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text("❌ La solicitud tardó demasiado. Intenta nuevamente.")),
@@ -278,6 +295,7 @@ class _MainScreenState extends State<MainScreen> {
                           : Text("Unirse a la Sala", style: TextStyle(fontSize: 18, color: Colors.white)),
                     ),
                   ),
+
 
 
 
