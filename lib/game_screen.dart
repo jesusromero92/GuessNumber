@@ -311,12 +311,12 @@ class _GameScreenState extends State<GameScreenGame> {
 
 
 // ✅ Método para manejar salida voluntaria
+  // ✅ Método para manejar salida voluntaria y volver correctamente a MainScreen
   Future<bool> _handleExit() async {
     hasExited = true; // 🔥 Marcar que este jugador salió voluntariamente
 
     try {
-      await http.delete(
-          Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
+      await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
 
       _channel?.sink.add(jsonEncode({
         "type": "player_left",
@@ -326,8 +326,11 @@ class _GameScreenState extends State<GameScreenGame> {
       _channel?.sink.close();
       _channel = null;
 
+      // 🔥 Verificar si la pantalla está montada antes de navegar
       if (mounted) {
-        Navigator.pop(context); // 🔥 Regresar a MainScreen SIN Snackbar
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false, arguments: {
+          "snackbarMessage": "Has salido de la sala."
+        });
       }
     } catch (e) {
       print("❌ Error al salir de la sala: $e");
@@ -335,6 +338,7 @@ class _GameScreenState extends State<GameScreenGame> {
 
     return Future.value(true);
   }
+
 
 
   // 🔥 Nueva función para obtener tu número secreto
