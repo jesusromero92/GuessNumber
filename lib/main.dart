@@ -227,28 +227,26 @@ class _MainScreenState extends State<MainScreen> {
                             Future.delayed(Duration(seconds: 5), () => throw TimeoutException("Tiempo de espera agotado")),
                           ]);
 
-                          if (response is http.Response) {
-                            if (response.statusCode == 403) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("❌ La sala está llena, intenta otra.")),
-                              );
-                            } else if (response.statusCode == 200) {
-                              await _saveLastSession(_nameController.text, _roomController.text);
-                              Navigator.pushNamed(
-                                context,
-                                '/game',
-                                arguments: {
-                                  'username': _nameController.text,
-                                  'roomId': _roomController.text,
-                                },
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("❌ Error al unirse a la sala.")),
-                              );
-                            }
+                          if (response.statusCode == 403) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("❌ La sala está llena, intenta otra.")),
+                            );
+                          } else if (response.statusCode == 200) {
+                            await _saveLastSession(_nameController.text, _roomController.text);
+                            Navigator.pushNamed(
+                              context,
+                              '/game',
+                              arguments: {
+                                'username': _nameController.text,
+                                'roomId': _roomController.text,
+                              },
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("❌ Error al unirse a la sala.")),
+                            );
                           }
-                        } catch (e) {
+                                                } catch (e) {
                           print("❌ Error: $e");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text("❌ La solicitud tardó demasiado. Intenta nuevamente.")),
