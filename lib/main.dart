@@ -132,6 +132,120 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  // 🔥 Método para obtener la lista de salas disponibles desde la API
+  Future<void> _showAvailableRooms() async {
+    try {
+      final response = await http.get(Uri.parse('http://109.123.248.19:4000/list-rooms'));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        List<dynamic> rooms = data['rooms'];
+
+        if (rooms.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("🚫 No hay salas disponibles en este momento.")),
+          );
+          return;
+        }
+
+        // 🔥 Mostrar diálogo con la lista de salas
+        _showRoomsDialog(rooms);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ Error al obtener salas.")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error al cargar salas: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ No se pudieron obtener las salas.")),
+      );
+    }
+  }
+
+// 🔥 Método para mostrar el diálogo con las salas disponibles
+  void _showRoomsDialog(List<dynamic> rooms) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Salas Disponibles"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: rooms.map((room) {
+              return ListTile(
+                title: Text("Sala: ${room['id'] ?? 'Desconocida'}"), // ✅ Ahora muestra correctamente la ID
+                subtitle: Text("Jugadores: ${room['players'] ?? 0}/2"), // ✅ Muestra correctamente los jugadores
+                trailing: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Cierra el diálogo
+                    _joinRoom(room['id']); // 🔥 Unirse a la sala seleccionada
+                  },
+                  child: Text("Unirse"),
+                ),
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Cerrar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  // 🔥 Método para unirse a una sala
+  Future<void> _joinRoom(String roomId) async {
+    if (_nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Ingresá un nombre antes de unirte a una sala.")),
+      );
+      return;
+    }
+
+    setState(() {
+      _isJoining = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://109.123.248.19:4000/join-room'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "roomId": roomId,
+          "username": _nameController.text,
+        }),
+      );
+
+      if (response.statusCode == 403) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ La sala está llena, intenta otra.")),
+        );
+      } else if (response.statusCode == 200) {
+        await _saveLastSession(_nameController.text, roomId);
+        Navigator.pushNamed(
+          context,
+          '/game',
+          arguments: {'username': _nameController.text, 'roomId': roomId},
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ Error al unirse a la sala.")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error al unirse a la sala: $e");
+    } finally {
+      setState(() {
+        _isJoining = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -295,6 +409,17 @@ class _MainScreenState extends State<MainScreen> {
                           : Text("Unirse a la Sala", style: TextStyle(fontSize: 18, color: Colors.white)),
                     ),
                   ),
+                  // 🔥 Botón para listar salas disponibles
+                  ElevatedButton(
+                    onPressed: _isJoining ? null : _showAvailableRooms,
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: Colors.greenAccent, // 🔥 Color diferente para diferenciarlo
+                    ),
+                    child: Text("Listar Salas", style: TextStyle(fontSize: 18, color: Colors.black)),
+                  ),
+
 
 
 
