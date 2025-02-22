@@ -41,9 +41,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _roomController = TextEditingController();
+  final TextEditingController _digitsController = TextEditingController();
   bool _snackbarShown = false;
   String? _snackbarMessage;
   bool _isJoining = false; // 🔥 Nuevo estado para deshabilitar el botón
+
 
   @override
   void initState() {
@@ -67,27 +69,27 @@ class _MainScreenState extends State<MainScreen> {
     await prefs.setString("lastRoomId", roomId);
   }
 
-// 🔥 Método para crear una sala con timeout de 5 segundos
-  Future<void> createRoom(String roomId, String username) async {
+// 🔥 Modificar `createRoom` para incluir los dígitos en la solicitud
+  Future<void> createRoom(String roomId, String username, int digits) async {
     setState(() {
-      _isJoining = true; // 🔥 Bloquea el botón y cambia a gris
+      _isJoining = true;
     });
 
-    await Future.delayed(Duration(milliseconds: 50)); // 🔥 Permite que la UI se actualice antes de continuar
+    await Future.delayed(Duration(milliseconds: 50));
 
     try {
       final response = await Future.any([
         http.post(
           Uri.parse('http://109.123.248.19:4000/create-room'),
           headers: {"Content-Type": "application/json"},
-          body: jsonEncode({"roomId": roomId, "username": username}),
+          body: jsonEncode({"roomId": roomId, "username": username, "digits": digits}),
         ),
         Future.delayed(Duration(seconds: 5), () => throw TimeoutException("Tiempo de espera agotado")),
       ]);
 
       if (response is http.Response) {
         if (response.statusCode == 200) {
-          print("Sala creada y usuario registrado.");
+          print("Sala creada con éxito.");
         } else {
           print("Error al crear la sala: ${response.body}");
         }
@@ -99,7 +101,7 @@ class _MainScreenState extends State<MainScreen> {
       );
     } finally {
       setState(() {
-        _isJoining = false; // 🔥 Reactiva el botón después de la respuesta o timeout
+        _isJoining = false;
       });
     }
   }
@@ -199,6 +201,7 @@ class _MainScreenState extends State<MainScreen> {
 
 
   // 🔥 Método para unirse a una sala
+  // 🔥 Método para unirse a una sala (por defecto 4 dígitos)
   Future<void> _joinRoom(String roomId) async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -218,6 +221,7 @@ class _MainScreenState extends State<MainScreen> {
         body: jsonEncode({
           "roomId": roomId,
           "username": _nameController.text,
+          "digits": 4  // 🔥 Siempre usa 4 dígitos al unirse
         }),
       );
 
@@ -245,6 +249,190 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
   }
+
+// 🔥 Método para mostrar el diálogo de creación de sala
+  void _showCreateRoomDialog() {
+    int _selectedDigits = 3; // 🔥 Valor por defecto
+    TextEditingController _roomIdController = TextEditingController(); // 🔥 Controlador para el ID de la sala
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder( // 🔥 Permite actualizar el estado dentro del diálogo
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text("Crear Sala"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 🔥 Input para el ID de la Sala
+                  TextField(
+                    controller: _roomIdController,
+                    decoration: InputDecoration(
+                      labelText: "ID de la Sala",
+                      hintText: "Ejemplo: 123ABC",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  SizedBox(height: 15),
+
+                  // 🔥 Dropdown para elegir el número de dígitos
+                  Text("Elige la cantidad de dígitos"),
+                  DropdownButton<int>(
+                    value: _selectedDigits,
+                    items: [2, 3, 4, 5].map((value) {
+                      return DropdownMenuItem<int>(
+                        value: value,
+                        child: Text("$value Dígitos"),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        setDialogState(() { // 🔥 Actualiza el estado dentro del diálogo
+                          _selectedDigits = newValue;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text("Cancelar"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_roomIdController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("❌ Ingresá un ID para la sala.")),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(context);
+                    _createRoomAndJoin(_roomIdController.text, _selectedDigits);
+                  },
+                  child: Text("Crear y Entrar"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _createRoom() async {
+    if (_nameController.text.isEmpty || _roomController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Ingresá un nombre y un ID de sala antes de crearla.")),
+      );
+      return;
+    }
+
+    int? digits = int.tryParse(_digitsController.text);
+    if (digits == null || digits < 4 || digits > 7) {
+      digits = 4; // 🔥 Si es inválido, se asigna el valor por defecto de 4
+    }
+
+    String roomId = _roomController.text; // 🔥 Usa el ID ingresado en el input
+
+    setState(() {
+      _isJoining = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://109.123.248.19:4000/create-room'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "roomId": roomId,
+          "username": _nameController.text,
+          "digits": digits,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ Sala creada con éxito. Uniendo al jugador...");
+
+        await _saveLastSession(_nameController.text, roomId);
+        Navigator.pushNamed(
+          context,
+          '/game',
+          arguments: {'username': _nameController.text, 'roomId': roomId, 'digits': digits},
+        );
+      } else {
+        print("❌ Error al crear la sala: ${response.body}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ No se pudo crear la sala.")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error en la creación de la sala: $e");
+    } finally {
+      setState(() {
+        _isJoining = false;
+      });
+    }
+  }
+
+
+
+// 🔥 Método para crear la sala y meterte en la partida automáticamente
+  void _createRoomAndJoin(String roomId, int digits) async {
+    if (_nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Ingresá un nombre antes de crear la sala.")),
+      );
+      return;
+    }
+
+    setState(() {
+      _isJoining = true;
+    });
+
+    try {
+      final response = await Future.any([
+        http.post(
+          Uri.parse('http://109.123.248.19:4000/create-room'),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({"roomId": roomId, "username": _nameController.text, "digits": digits}),
+        ),
+        Future.delayed(Duration(seconds: 5), () => throw TimeoutException("Tiempo de espera agotado")),
+      ]);
+
+      if (response is http.Response && response.statusCode == 200) {
+        print("✅ Sala creada con éxito. Uniendo a la partida...");
+
+        // 🔥 Guardar la sesión
+        await _saveLastSession(_nameController.text, roomId);
+
+        // 🔥 Redirigir al juego
+        Navigator.pushNamed(
+          context,
+          '/game',
+          arguments: {'username': _nameController.text, 'roomId': roomId},
+        );
+      } else {
+        print("❌ Error al crear la sala: ${response.body}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ No se pudo crear la sala.")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ La solicitud tardó demasiado. Intenta nuevamente.")),
+      );
+    } finally {
+      setState(() {
+        _isJoining = false;
+      });
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -332,83 +520,34 @@ class _MainScreenState extends State<MainScreen> {
 
                   SizedBox(height: 25),
 
-                  // 🔥 Botón de Unirse a la Sala
-                  // 🔥 Botón de Unirse a la Sala con verificación de capacidad
-                  ElevatedButton(
-                    onPressed: _isJoining || _nameController.text.contains("?") || _nameController.text.contains("¿")
-                        ? null
-                        : () async {
-                      setState(() {
-                        _isJoining = true; // 🔥 Cambia de color inmediatamente
-                      });
-
-                      await Future.delayed(Duration(milliseconds: 50)); // 🔥 Espera para permitir el cambio de color antes del spinner
-
-                      if (_nameController.text.isNotEmpty && _roomController.text.isNotEmpty) {
-                        try {
-                          final response = await Future.any([
-                            http.post(
-                              Uri.parse('http://109.123.248.19:4000/join-room'),
-                              headers: {"Content-Type": "application/json"},
-                              body: jsonEncode({
-                                "roomId": _roomController.text,
-                                "username": _nameController.text
-                              }),
-                            ),
-                            Future.delayed(Duration(seconds: 5), () => throw TimeoutException("Tiempo de espera agotado")),
-                          ]);
-
-                          if (response.statusCode == 403) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("❌ La sala está llena, intenta otra.")),
-                            );
-                          } else if (response.statusCode == 200) {
-                            await _saveLastSession(_nameController.text, _roomController.text);
-                            Navigator.pushNamed(
-                              context,
-                              '/game',
-                              arguments: {
-                                'username': _nameController.text,
-                                'roomId': _roomController.text,
-                              },
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text("❌ Error al unirse a la sala.")),
-                            );
-                          }
-                        } catch (e) {
-                          print("❌ Error: $e");
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("❌ La solicitud tardó demasiado. Intenta nuevamente.")),
-                          );
-                        } finally {
-                          setState(() {
-                            _isJoining = false; // 🔥 Reactiva el botón tras la respuesta o timeout
-                          });
-                        }
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("❌ Por favor, ingresa todos los datos.")),
-                        );
-
-                        setState(() {
-                          _isJoining = false; // 🔥 Reactiva el botón si faltan datos
-                        });
+                  // 🔥 Input para definir la cantidad de dígitos en la sala
+                  TextField(
+                    controller: _digitsController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.2),
+                      hintText: "Cantidad de dígitos (4-7)",
+                      hintStyle: TextStyle(color: Colors.white70),
+                      prefixIcon: Icon(Icons.pin, color: Colors.white),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      int? newValue = int.tryParse(value);
+                      if (newValue == null || newValue < 4 || newValue > 7) {
+                        _digitsController.text = "4"; // 🔥 Si es inválido, vuelve a 4
                       }
                     },
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: _isJoining ? Colors.grey : Colors.blueAccent, // 🔥 Cambia de color inmediatamente
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: Duration(milliseconds: 50), // 🔥 Espera para mostrar el spinner después del cambio de color
-                      child: _isJoining
-                          ? CircularProgressIndicator(color: Colors.white) // 🔥 Ahora aparece después del cambio de color
-                          : Text("Unirse a la Sala", style: TextStyle(fontSize: 18, color: Colors.white)),
-                    ),
                   ),
+
+                  SizedBox(height: 15),
+
+                  // 🔥 Botón de Unirse a la Sala
+                  // 🔥 Botón de Unirse a la Sala con verificación de capacida
                   // 🔥 Botón para listar salas disponibles
                   ElevatedButton(
                     onPressed: _isJoining ? null : _showAvailableRooms,
@@ -419,6 +558,17 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     child: Text("Listar Salas", style: TextStyle(fontSize: 18, color: Colors.black)),
                   ),
+                  // 🔥 Agregar este botón en el `build` dentro de `Column`
+                  ElevatedButton(
+                    onPressed: _isJoining ? null : _createRoom,
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: Colors.orangeAccent,
+                    ),
+                    child: Text("Crear Sala", style: TextStyle(fontSize: 18, color: Colors.black)),
+                  ),
+
 
 
 

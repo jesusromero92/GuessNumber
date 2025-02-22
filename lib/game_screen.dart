@@ -28,6 +28,7 @@ class _GameScreenState extends State<GameScreenGame> {
   // ✅ Nueva lista para animar los emojis flotantes en la pantalla
   List<String> floatingEmojis = [];
   bool _exitRequested = false; // 🔥 Rastrea si el usuario ya presionó "Volver" una vez
+  int maxDigits = 4; // 🔥 Por defecto es 4, pero se actualizará según la sala
 
 
   @override
@@ -43,6 +44,11 @@ class _GameScreenState extends State<GameScreenGame> {
 
     // ✅ Conectar WebSocket de emojis una sola vez
     _emojiChannel = IOWebSocketChannel.connect('ws://109.123.248.19:4001/ws/emojis');
+
+    // ✅ Listener para actualizar el contador dinámicamente
+    _controller.addListener(() {
+      setState(() {}); // 🔥 Redibuja la UI cuando el usuario escribe
+    });
 
     // ✅ Escuchar los emojis del oponente
     _emojiChannel!.stream.listen((message) {
@@ -289,13 +295,10 @@ class _GameScreenState extends State<GameScreenGame> {
   void _sendGuess() {
     String guess = _controller.text;
 
-    // ✅ Verifica que el número tenga 4 dígitos únicos
-    if (guess.length != 4 || guess
-        .split('')
-        .toSet()
-        .length != 4) {
+    // ✅ Verifica que el número tenga la cantidad correcta de dígitos únicos
+    if (guess.length != maxDigits || guess.split('').toSet().length != maxDigits) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ No se pueden repetir cifras en el número.")),
+        SnackBar(content: Text("❌ Debe contener $maxDigits dígitos únicos.")),
       );
       return; // 🔥 No envía el intento si es inválido
     }
@@ -351,6 +354,7 @@ class _GameScreenState extends State<GameScreenGame> {
         final data = jsonDecode(response.body);
         setState(() {
           myNumber = data['my_number']?.toString() ?? "Desconocido";
+          maxDigits = myNumber.length; // 🔥 Ajustar maxDigits al tamaño del número secreto
         });
       } else {
         print("❌ Error al obtener mi número: ${response.body}");
@@ -359,6 +363,7 @@ class _GameScreenState extends State<GameScreenGame> {
       print("❌ Error en la solicitud de mi número: $e");
     }
   }
+
 
   Future<bool> _showExitConfirmationDialog() async {
     return await showDialog(
@@ -646,7 +651,7 @@ class _GameScreenState extends State<GameScreenGame> {
                         child: TextField(
                           controller: _controller,
                           keyboardType: TextInputType.number,
-                          maxLength: 4,
+                          maxLength: maxDigits, // 🔥 Ahora es dinámico según la sala
                           enabled: isMyTurn,
                           style: TextStyle(color: Colors.white),
                           decoration: InputDecoration(
@@ -660,6 +665,7 @@ class _GameScreenState extends State<GameScreenGame> {
                               borderRadius: BorderRadius.circular(30),
                               borderSide: BorderSide.none,
                             ),
+                            counterText: "${_controller.text.length}/$maxDigits", // 🔥 Actualiza el contador dinámicamente
                             contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                           ),
                           onSubmitted: isMyTurn ? (_) => _sendGuess() : null,
