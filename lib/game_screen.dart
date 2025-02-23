@@ -11,7 +11,7 @@ class GameScreenGame extends StatefulWidget {
   _GameScreenState createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreenGame> {
+class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   WebSocketChannel? _channel;
   List<Map<String, String>> attempts = [];
@@ -35,20 +35,16 @@ class _GameScreenState extends State<GameScreenGame> {
   void dispose() {
     _channel?.sink.close();
     _emojiChannel?.sink.close();
+    WidgetsBinding.instance.removeObserver(this); // 🔥 Remover el observer
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
-
+    WidgetsBinding.instance.addObserver(this); // 🔥 Suscribir el observer
     // ✅ Conectar WebSocket de emojis una sola vez
     _emojiChannel = IOWebSocketChannel.connect('ws://109.123.248.19:4001/ws/emojis');
-
-    // ✅ Listener para actualizar el contador dinámicamente
-    _controller.addListener(() {
-      setState(() {}); // 🔥 Redibuja la UI cuando el usuario escribe
-    });
 
     // ✅ Escuchar los emojis del oponente
     _emojiChannel!.stream.listen((message) {
@@ -73,6 +69,41 @@ class _GameScreenState extends State<GameScreenGame> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkIfRoomExists(); // 🔥 Comprobar si la sala aún existe al volver al primer plano
+    }
+  }
+
+  Future<void> _checkIfRoomExists() async {
+    try {
+      final response = await http.get(Uri.parse('http://109.123.248.19:4000/room-exists/$roomId'));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (!data['exists']) {
+          _handleExitOnRoomDeleted(); // 🔥 Si la sala no existe, expulsar al jugador
+        }
+      } else {
+        print("❌ Error al comprobar existencia de la sala: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ Error en la solicitud de verificación de la sala: $e");
+    }
+  }
+
+  void _handleExitOnRoomDeleted() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("⚠️ La sala ha sido eliminada. Volviendo a la pantalla principal...")),
+      );
+
+      Future.delayed(Duration(seconds: 2), () {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      });
+    }
+  }
 
 
   @override
