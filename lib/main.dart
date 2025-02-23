@@ -8,6 +8,8 @@ import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'CreateRoomScreen.dart';
+import 'LoginScreen.dart';
+import 'RegisterScreen.dart';
 
 void main() {
   runApp(MyApp());
@@ -30,6 +32,8 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => MainScreen(),
         '/game': (context) => GameScreenGame(),
+        '/login': (context) => LoginScreen(), // ✅ Agregamos la ruta del login
+        '/register': (context) => RegisterScreen(), // ✅ Ruta de registro
       },
     );
   }
@@ -84,9 +88,11 @@ class _MainScreenState extends State<MainScreen> {
         http.post(
           Uri.parse('http://109.123.248.19:4000/create-room'),
           headers: {"Content-Type": "application/json"},
-          body: jsonEncode({"roomId": roomId, "username": username, "digits": digits}),
+          body: jsonEncode(
+              {"roomId": roomId, "username": username, "digits": digits}),
         ),
-        Future.delayed(Duration(seconds: 5), () => throw TimeoutException("Tiempo de espera agotado")),
+        Future.delayed(Duration(seconds: 5), () => throw TimeoutException(
+            "Tiempo de espera agotado")),
       ]);
 
       if (response is http.Response) {
@@ -99,7 +105,8 @@ class _MainScreenState extends State<MainScreen> {
     } catch (e) {
       print("❌ Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ La solicitud tardó demasiado. Intenta nuevamente.")),
+        SnackBar(content: Text(
+            "❌ La solicitud tardó demasiado. Intenta nuevamente.")),
       );
     } finally {
       setState(() {
@@ -109,14 +116,16 @@ class _MainScreenState extends State<MainScreen> {
   }
 
 
-
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    final args = ModalRoute
+        .of(context)
+        ?.settings
+        .arguments as Map?;
 
-    if (args != null && args.containsKey("snackbarMessage") && !_snackbarShown) {
+    if (args != null && args.containsKey("snackbarMessage") &&
+        !_snackbarShown) {
       _snackbarShown = true;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -139,7 +148,8 @@ class _MainScreenState extends State<MainScreen> {
   // 🔥 Método para obtener la lista de salas disponibles desde la API
   Future<void> _showAvailableRooms(BuildContext context) async {
     try {
-      final response = await http.get(Uri.parse('http://109.123.248.19:4000/list-rooms'));
+      final response = await http.get(
+          Uri.parse('http://109.123.248.19:4000/list-rooms'));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -172,8 +182,10 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisSize: MainAxisSize.min,
             children: rooms.map((room) {
               return ListTile(
-                title: Text("Sala: ${room['id'] ?? 'Desconocida'}"), // ✅ Ahora muestra correctamente la ID
-                subtitle: Text("Jugadores: ${room['players'] ?? 0}/2"), // ✅ Muestra correctamente los jugadores
+                title: Text("Sala: ${room['id'] ?? 'Desconocida'}"),
+                // ✅ Ahora muestra correctamente la ID
+                subtitle: Text("Jugadores: ${room['players'] ?? 0}/2"),
+                // ✅ Muestra correctamente los jugadores
                 trailing: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context); // Cierra el diálogo
@@ -199,7 +211,8 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _joinRoom(String roomId) async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Ingresá un nombre antes de unirte a una sala.")),
+        SnackBar(
+            content: Text("❌ Ingresá un nombre antes de unirte a una sala.")),
       );
       return;
     }
@@ -216,7 +229,8 @@ class _MainScreenState extends State<MainScreen> {
 
       if (roomInfoResponse.statusCode != 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ La sala no existe o no tiene jugadores aún.")),
+          SnackBar(
+              content: Text("❌ La sala no existe o no tiene jugadores aún.")),
         );
         setState(() {
           _isJoining = false;
@@ -234,7 +248,8 @@ class _MainScreenState extends State<MainScreen> {
         body: jsonEncode({
           "roomId": roomId,
           "username": _nameController.text,
-          "digits": roomDigits, // ✅ Se usa la cantidad de dígitos correcta obtenida de la API
+          "digits": roomDigits,
+          // ✅ Se usa la cantidad de dígitos correcta obtenida de la API
         }),
       );
 
@@ -247,7 +262,11 @@ class _MainScreenState extends State<MainScreen> {
         Navigator.pushNamed(
           context,
           '/game',
-          arguments: {'username': _nameController.text, 'roomId': roomId, 'digits': roomDigits},
+          arguments: {
+            'username': _nameController.text,
+            'roomId': roomId,
+            'digits': roomDigits
+          },
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -278,7 +297,9 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               Text(
                 "Salas Disponibles",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
               SizedBox(height: 10),
               rooms.isEmpty
@@ -315,7 +336,8 @@ class _MainScreenState extends State<MainScreen> {
                           ),
                           onPressed: () {
                             Navigator.pop(context); // Cerrar modal
-                            _joinRoom(room['id']); // 🔥 Unirse a la sala seleccionada
+                            _joinRoom(
+                                room['id']); // 🔥 Unirse a la sala seleccionada
                           },
                           child: Text("Unirse"),
                         ),
@@ -327,7 +349,8 @@ class _MainScreenState extends State<MainScreen> {
               SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text("Cerrar", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
+                child: Text("Cerrar",
+                    style: TextStyle(color: Colors.redAccent, fontSize: 18)),
               ),
             ],
           ),
@@ -337,14 +360,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
 
-
-
-
-
   void _createRoom() async {
     if (_nameController.text.isEmpty || _roomController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Ingresá un nombre y un ID de sala antes de crearla.")),
+        SnackBar(content: Text(
+            "❌ Ingresá un nombre y un ID de sala antes de crearla.")),
       );
       return;
     }
@@ -354,8 +374,10 @@ class _MainScreenState extends State<MainScreen> {
       digits = 4; // 🔥 Si es inválido, se asigna el valor por defecto de 4
     }
 
-    String roomId = _roomController.text.trim(); // 🔥 Elimina espacios en blanco
-    String username = _nameController.text.trim(); // 🔥 Elimina espacios en blanco
+    String roomId = _roomController.text
+        .trim(); // 🔥 Elimina espacios en blanco
+    String username = _nameController.text
+        .trim(); // 🔥 Elimina espacios en blanco
 
     setState(() {
       _isJoining = true;
@@ -370,7 +392,8 @@ class _MainScreenState extends State<MainScreen> {
       if (checkRoomResponse.statusCode == 200) {
         // 🚫 La sala ya existe, mostrar mensaje de error y salir
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ La sala '$roomId' ya existe. Usa otro ID.")),
+          SnackBar(
+              content: Text("❌ La sala '$roomId' ya existe. Usa otro ID.")),
         );
         setState(() {
           _isJoining = false;
@@ -391,7 +414,8 @@ class _MainScreenState extends State<MainScreen> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        int roomDigits = responseData["digits"] ?? digits; // 🔥 Asegurar que tomamos el valor correcto
+        int roomDigits = responseData["digits"] ??
+            digits; // 🔥 Asegurar que tomamos el valor correcto
 
         print("✅ Sala creada con éxito. Configurada para $roomDigits dígitos.");
 
@@ -399,12 +423,17 @@ class _MainScreenState extends State<MainScreen> {
         Navigator.pushNamed(
           context,
           '/game',
-          arguments: {'username': username, 'roomId': roomId, 'digits': roomDigits},
+          arguments: {
+            'username': username,
+            'roomId': roomId,
+            'digits': roomDigits
+          },
         );
       } else {
         print("❌ Error al crear la sala: ${response.body}");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ No se pudo crear la sala. Intenta con otro ID.")),
+          SnackBar(content: Text(
+              "❌ No se pudo crear la sala. Intenta con otro ID.")),
         );
       }
     } catch (e) {
@@ -418,8 +447,6 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
   }
-
-
 
 
 // 🔥 Método para crear la sala y meterte en la partida automáticamente
@@ -440,9 +467,14 @@ class _MainScreenState extends State<MainScreen> {
         http.post(
           Uri.parse('http://109.123.248.19:4000/create-room'),
           headers: {"Content-Type": "application/json"},
-          body: jsonEncode({"roomId": roomId, "username": _nameController.text, "digits": digits}),
+          body: jsonEncode({
+            "roomId": roomId,
+            "username": _nameController.text,
+            "digits": digits
+          }),
         ),
-        Future.delayed(Duration(seconds: 5), () => throw TimeoutException("Tiempo de espera agotado")),
+        Future.delayed(Duration(seconds: 5), () => throw TimeoutException(
+            "Tiempo de espera agotado")),
       ]);
 
       if (response is http.Response && response.statusCode == 200) {
@@ -466,7 +498,8 @@ class _MainScreenState extends State<MainScreen> {
     } catch (e) {
       print("❌ Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ La solicitud tardó demasiado. Intenta nuevamente.")),
+        SnackBar(content: Text(
+            "❌ La solicitud tardó demasiado. Intenta nuevamente.")),
       );
     } finally {
       setState(() {
@@ -474,7 +507,6 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
   }
-
 
 
   @override
@@ -504,19 +536,27 @@ class _MainScreenState extends State<MainScreen> {
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   SizedBox(height: 30),
+
+                  // 🔥 Botón de Login que redirige a la pantalla de Login
                   ElevatedButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation1, animation2) => CreateRoomScreen(),
-                        transitionDuration: Duration.zero, // 🔥 Sin animación
-                        reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
-                      ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/login'); // ✅ Redirige a LoginScreen
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      padding: EdgeInsets.symmetric(vertical: 14, horizontal: 30),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
+                    child: Text("Iniciar Sesión", style: TextStyle(fontSize: 18, color: Colors.white)),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  ElevatedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/create-room'),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
                     child: Text("Crear Sala", style: TextStyle(fontSize: 18, color: Colors.black)),
                   ),
-
 
                   SizedBox(height: 10),
                   ElevatedButton(
