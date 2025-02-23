@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+
 import 'CreateRoomScreen.dart';
 import 'LoginScreen.dart';
 import 'RegisterScreen.dart';
@@ -34,6 +35,7 @@ class MyApp extends StatelessWidget {
         '/game': (context) => GameScreenGame(),
         '/login': (context) => LoginScreen(), // ✅ Agregamos la ruta del login
         '/register': (context) => RegisterScreen(), // ✅ Ruta de registro
+        '/create-room': (context) => CreateRoomScreen(), // ✅ Agregar esta línea
       },
     );
   }

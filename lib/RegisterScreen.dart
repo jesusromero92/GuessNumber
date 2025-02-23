@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'LoginScreen.dart'; // ✅ Importamos la pantalla de login
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -11,6 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isLoading = false; // 🔄 Estado para deshabilitar botón mientras registra
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +53,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                   _buildTextField("Username", Icons.person, false, _usernameController),
                   SizedBox(height: 10),
-                  _buildTextField("Email address", Icons.email, false, _emailController),
+                  _buildTextField("Email address (Optional)", Icons.email, false, _emailController),
                   SizedBox(height: 10),
                   _buildTextField("Password", Icons.lock, true, _passwordController),
                   SizedBox(height: 10),
@@ -114,36 +118,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildRegisterButton() {
     return ElevatedButton(
-      onPressed: () {
-        if (_usernameController.text.isEmpty ||
-            _emailController.text.isEmpty ||
-            _passwordController.text.isEmpty ||
-            _confirmPasswordController.text.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("❌ Todos los campos son obligatorios.")),
-          );
-          return;
-        }
-
-        if (_passwordController.text != _confirmPasswordController.text) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("❌ Las contraseñas no coinciden.")),
-          );
-          return;
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("✅ Cuenta creada con éxito!")),
-        );
-
-        Navigator.pop(context); // ✅ Volver a Login después del registro
-      },
+      onPressed: _isLoading ? null : _registerUser, // 🔥 Llama a la función de registro
       style: ElevatedButton.styleFrom(
         foregroundColor: Colors.blue.shade900, backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         padding: EdgeInsets.symmetric(horizontal: 100, vertical: 15),
       ),
-      child: Text("REGISTER", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      child: _isLoading
+          ? CircularProgressIndicator(color: Colors.blue.shade900) // 🔄 Indicador de carga
+          : Text("REGISTER", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
     );
+  }
+
+  // 🔥 Función para registrar usuario en la API
+  Future<void> _registerUser() async {
+    final String username = _usernameController.text.trim();
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text.trim();
+    final String confirmPassword = _confirmPasswordController.text.trim();
+
+    // ✅ Validaciones antes de enviar la solicitud
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ El username es obligatorio.")));
+      return;
+    }
+    if (password.isNotEmpty && password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ Las contraseñas no coinciden.")));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://109.123.248.19:4000/register'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "username": username,
+          "email": email.isNotEmpty ? email : null, // Email opcional
+          "password": password.isNotEmpty ? password : null, // Password opcional
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ ${data['message']}")));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginScreen())); // 🔥 Redirigir a login
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ ${data['error']}")));
+      }
+    } catch (e) {
+      print("❌ Error al registrar usuario: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ Error de conexión, intenta nuevamente.")));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 }
