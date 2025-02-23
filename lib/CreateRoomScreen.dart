@@ -67,7 +67,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
             "digits": digits,
           }),
         ),
-        Future.delayed(Duration(seconds: 5), () => throw TimeoutException("⏳ Tiempo de espera agotado")),
+        Future.delayed(Duration(seconds: 15), () => throw TimeoutException("⏳ Tiempo de espera agotado")),
       ]);
 
       if (response is http.Response && response.statusCode == 200) {
