@@ -143,15 +143,8 @@ class _MainScreenState extends State<MainScreen> {
         final data = jsonDecode(response.body);
         List<dynamic> rooms = data['rooms'];
 
-        if (rooms.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("🚫 No hay salas disponibles en este momento.")),
-          );
-          return;
-        }
-
-        // 🔥 Mostrar diálogo con la lista de salas
-        _showRoomsDialog(rooms);
+        // 🔥 Mostrar el modal inferior con las salas disponibles
+        _showRoomsBottomSheet(rooms);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("❌ Error al obtener salas.")),
@@ -164,6 +157,7 @@ class _MainScreenState extends State<MainScreen> {
       );
     }
   }
+
 
 // 🔥 Método para mostrar el diálogo con las salas disponibles
   void _showRoomsDialog(List<dynamic> rooms) {
@@ -200,8 +194,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
 
-  // 🔥 Método para unirse a una sala
-  // 🔥 Método para unirse a una sala (por defecto 4 dígitos)
   Future<void> _joinRoom(String roomId) async {
     if (_nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -215,13 +207,32 @@ class _MainScreenState extends State<MainScreen> {
     });
 
     try {
+      // 🔥 Obtener la información de la sala para determinar la cantidad de dígitos correcta
+      final roomInfoResponse = await http.get(
+        Uri.parse('http://109.123.248.19:4000/room-info/$roomId'),
+      );
+
+      if (roomInfoResponse.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ La sala no existe o no tiene jugadores aún.")),
+        );
+        setState(() {
+          _isJoining = false;
+        });
+        return;
+      }
+
+      final roomData = jsonDecode(roomInfoResponse.body);
+      int roomDigits = roomData["digits"]; // ✅ Ahora obtenemos correctamente los dígitos de la sala
+
+      // 🔥 Intentamos unirnos con los dígitos correctos
       final response = await http.post(
         Uri.parse('http://109.123.248.19:4000/join-room'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "roomId": roomId,
           "username": _nameController.text,
-          "digits": 4  // 🔥 Siempre usa 4 dígitos al unirse
+          "digits": roomDigits, // ✅ Se usa la cantidad de dígitos correcta obtenida de la API
         }),
       );
 
@@ -234,7 +245,7 @@ class _MainScreenState extends State<MainScreen> {
         Navigator.pushNamed(
           context,
           '/game',
-          arguments: {'username': _nameController.text, 'roomId': roomId},
+          arguments: {'username': _nameController.text, 'roomId': roomId, 'digits': roomDigits},
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -250,78 +261,83 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-// 🔥 Método para mostrar el diálogo de creación de sala
-  void _showCreateRoomDialog() {
-    int _selectedDigits = 3; // 🔥 Valor por defecto
-    TextEditingController _roomIdController = TextEditingController(); // 🔥 Controlador para el ID de la sala
-
-    showDialog(
+  void _showRoomsBottomSheet(List<dynamic> rooms) {
+    showModalBottomSheet(
       context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: Colors.black87, // 🔥 Fondo oscuro para el modal
       builder: (context) {
-        return StatefulBuilder( // 🔥 Permite actualizar el estado dentro del diálogo
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text("Crear Sala"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 🔥 Input para el ID de la Sala
-                  TextField(
-                    controller: _roomIdController,
-                    decoration: InputDecoration(
-                      labelText: "ID de la Sala",
-                      hintText: "Ejemplo: 123ABC",
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  SizedBox(height: 15),
-
-                  // 🔥 Dropdown para elegir el número de dígitos
-                  Text("Elige la cantidad de dígitos"),
-                  DropdownButton<int>(
-                    value: _selectedDigits,
-                    items: [2, 3, 4, 5].map((value) {
-                      return DropdownMenuItem<int>(
-                        value: value,
-                        child: Text("$value Dígitos"),
-                      );
-                    }).toList(),
-                    onChanged: (newValue) {
-                      if (newValue != null) {
-                        setDialogState(() { // 🔥 Actualiza el estado dentro del diálogo
-                          _selectedDigits = newValue;
-                        });
-                      }
-                    },
-                  ),
-                ],
+        return Container(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Salas Disponibles",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text("Cancelar"),
+              SizedBox(height: 10),
+              rooms.isEmpty
+                  ? Center(
+                child: Text(
+                  "🚫 No hay salas disponibles.",
+                  style: TextStyle(color: Colors.white70),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_roomIdController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("❌ Ingresá un ID para la sala.")),
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(context);
-                    _createRoomAndJoin(_roomIdController.text, _selectedDigits);
+              )
+                  : Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: rooms.length,
+                  itemBuilder: (context, index) {
+                    final room = rooms[index];
+                    return Card(
+                      color: Colors.grey[900],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          "Sala: ${room['id'] ?? 'Desconocida'}",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          "Jugadores: ${room['players'] ?? 0}/2",
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                        trailing: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.greenAccent,
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context); // Cerrar modal
+                            _joinRoom(room['id']); // 🔥 Unirse a la sala seleccionada
+                          },
+                          child: Text("Unirse"),
+                        ),
+                      ),
+                    );
                   },
-                  child: Text("Crear y Entrar"),
                 ),
-              ],
-            );
-          },
+              ),
+              SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("Cerrar", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
+              ),
+            ],
+          ),
         );
       },
     );
   }
+
+
+
+
+
 
   void _createRoom() async {
     if (_nameController.text.isEmpty || _roomController.text.isEmpty) {
@@ -336,46 +352,71 @@ class _MainScreenState extends State<MainScreen> {
       digits = 4; // 🔥 Si es inválido, se asigna el valor por defecto de 4
     }
 
-    String roomId = _roomController.text; // 🔥 Usa el ID ingresado en el input
+    String roomId = _roomController.text.trim(); // 🔥 Elimina espacios en blanco
+    String username = _nameController.text.trim(); // 🔥 Elimina espacios en blanco
 
     setState(() {
       _isJoining = true;
     });
 
     try {
+      // 🔥 PRIMERO VERIFICAMOS SI LA SALA YA EXISTE
+      final checkRoomResponse = await http.get(
+        Uri.parse('http://109.123.248.19:4000/room-info/$roomId'),
+      );
+
+      if (checkRoomResponse.statusCode == 200) {
+        // 🚫 La sala ya existe, mostrar mensaje de error y salir
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ La sala '$roomId' ya existe. Usa otro ID.")),
+        );
+        setState(() {
+          _isJoining = false;
+        });
+        return;
+      }
+
+      // 🔥 SI NO EXISTE, PROCEDER A CREARLA
       final response = await http.post(
         Uri.parse('http://109.123.248.19:4000/create-room'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "roomId": roomId,
-          "username": _nameController.text,
+          "username": username,
           "digits": digits,
         }),
       );
 
       if (response.statusCode == 200) {
-        print("✅ Sala creada con éxito. Uniendo al jugador...");
+        final responseData = jsonDecode(response.body);
+        int roomDigits = responseData["digits"] ?? digits; // 🔥 Asegurar que tomamos el valor correcto
 
-        await _saveLastSession(_nameController.text, roomId);
+        print("✅ Sala creada con éxito. Configurada para $roomDigits dígitos.");
+
+        await _saveLastSession(username, roomId);
         Navigator.pushNamed(
           context,
           '/game',
-          arguments: {'username': _nameController.text, 'roomId': roomId, 'digits': digits},
+          arguments: {'username': username, 'roomId': roomId, 'digits': roomDigits},
         );
       } else {
         print("❌ Error al crear la sala: ${response.body}");
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ No se pudo crear la sala.")),
+          SnackBar(content: Text("❌ No se pudo crear la sala. Intenta con otro ID.")),
         );
       }
     } catch (e) {
       print("❌ Error en la creación de la sala: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Ocurrió un error al crear la sala.")),
+      );
     } finally {
       setState(() {
         _isJoining = false;
       });
     }
   }
+
 
 
 
@@ -558,6 +599,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     child: Text("Listar Salas", style: TextStyle(fontSize: 18, color: Colors.black)),
                   ),
+                  SizedBox(height: 15),
                   // 🔥 Agregar este botón en el `build` dentro de `Column`
                   ElevatedButton(
                     onPressed: _isJoining ? null : _createRoom,
