@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'CreateRoomScreen.dart';
+
 void main() {
   runApp(MyApp());
 }
@@ -135,7 +137,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   // 🔥 Método para obtener la lista de salas disponibles desde la API
-  Future<void> _showAvailableRooms() async {
+  Future<void> _showAvailableRooms(BuildContext context) async {
     try {
       final response = await http.get(Uri.parse('http://109.123.248.19:4000/list-rooms'));
 
@@ -480,18 +482,15 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔥 Fondo
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
                 image: AssetImage("assets/background.png"),
                 fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.6), BlendMode.darken),
+                colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
               ),
             ),
           ),
-
           Center(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
@@ -505,120 +504,26 @@ class _MainScreenState extends State<MainScreen> {
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   SizedBox(height: 30),
-
-                  // 🔥 Input Nombre de Usuario
-                  // 🔥 Input Nombre de Usuario con validación
-                  TextField(
-                    controller: _nameController,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      hintText: "Nombre de usuario",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.person, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (value) {
-                      if (value.contains("?") || value.contains("¿")) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("❌ No se permiten los caracteres '?' o '¿'.")),
-                        );
-
-                        // 🔥 Elimina automáticamente los caracteres inválidos
-                        setState(() {
-                          _nameController.text = value.replaceAll(RegExp(r'[?¿]'), '');
-                          _nameController.selection = TextSelection.fromPosition(
-                            TextPosition(offset: _nameController.text.length),
-                          );
-                        });
-                      }
-                    },
-                  ),
-
-
-                  SizedBox(height: 15),
-
-                  // 🔥 Input ID de Sala
-                  TextField(
-                    controller: _roomController,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      hintText: "ID de Sala",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.meeting_room, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 25),
-
-                  // 🔥 Input para definir la cantidad de dígitos en la sala
-                  TextField(
-                    controller: _digitsController,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      hintText: "Cantidad de dígitos (4-7)",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.pin, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (value) {
-                      int? newValue = int.tryParse(value);
-                      if (newValue == null || newValue < 4 || newValue > 7) {
-                        _digitsController.text = "4"; // 🔥 Si es inválido, vuelve a 4
-                      }
-                    },
-                  ),
-
-                  SizedBox(height: 15),
-
-                  // 🔥 Botón de Unirse a la Sala
-                  // 🔥 Botón de Unirse a la Sala con verificación de capacida
-                  // 🔥 Botón para listar salas disponibles
                   ElevatedButton(
-                    onPressed: _isJoining ? null : _showAvailableRooms,
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: Colors.greenAccent, // 🔥 Color diferente para diferenciarlo
+                    onPressed: () => Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation1, animation2) => CreateRoomScreen(),
+                        transitionDuration: Duration.zero, // 🔥 Sin animación
+                        reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
+                      ),
                     ),
-                    child: Text("Listar Salas", style: TextStyle(fontSize: 18, color: Colors.black)),
-                  ),
-                  SizedBox(height: 15),
-                  // 🔥 Agregar este botón en el `build` dentro de `Column`
-                  ElevatedButton(
-                    onPressed: _isJoining ? null : _createRoom,
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: Colors.orangeAccent,
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
                     child: Text("Crear Sala", style: TextStyle(fontSize: 18, color: Colors.black)),
                   ),
 
 
-
-
-
-
-
-
-
+                  SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () => _showAvailableRooms(context),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent),
+                    child: Text("Listar Salas", style: TextStyle(fontSize: 18, color: Colors.black)),
+                  ),
                 ],
               ),
             ),
