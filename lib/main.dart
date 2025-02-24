@@ -16,9 +16,12 @@ import 'RegisterScreen.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 Ocultar SOLO la barra de estado (mantiene la barra de navegación)
-  //_hideStatusBar(); // Ocultar la barra de estado al iniciar
-  runApp(MyApp());
+  // 🔥 Bloquear la orientación a vertical
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]).then((_) {
+    runApp(MyApp());
+  });
 }
 void _hideStatusBar() {
   SystemChrome.setEnabledSystemUIMode(
