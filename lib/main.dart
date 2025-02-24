@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'banner_ad_widget.dart';
 import 'top_bar.dart'; // 🔥 Importar el TopBar
 import 'CreateRoomScreen.dart';
 import 'LoginScreen.dart';
@@ -15,7 +17,7 @@ import 'RegisterScreen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
+  MobileAds.instance.initialize(); // 🔥 Inicializar Google Mobile Ads
   // 🔥 Bloquear la orientación a vertical
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -472,11 +474,9 @@ class _MainScreenState extends State<MainScreen> {
         final bool isHorizontal = constraints.maxWidth > constraints.maxHeight;
         final bool isSmallScreen = constraints.maxWidth < 1000;
 
-        // 🔥 Depuración visual
         debugPrint("📱 Ancho: ${constraints.maxWidth}, Alto: ${constraints.maxHeight}");
         debugPrint("🛠️ Horizontal: $isHorizontal, Pequeña: $isSmallScreen");
 
-        // 🔥 Ajustes dinámicos
         final double iconSize = isHorizontal && isSmallScreen ? 50 : 100;
         final double titleFontSize = isHorizontal && isSmallScreen ? 20 : 32;
         final double buttonHeight = isHorizontal && isSmallScreen ? 40 : 60;
@@ -484,8 +484,8 @@ class _MainScreenState extends State<MainScreen> {
 
         return Scaffold(
           appBar: PreferredSize(
-            preferredSize: Size.fromHeight(60), // 🔥 Tamaño fijo del AppBar
-            child: SafeArea(child: TopBar()), // 🔥 Evita que la barra de estado lo afecte
+            preferredSize: Size.fromHeight(60),
+            child: SafeArea(child: TopBar()),
           ),
           body: Stack(
             children: [
@@ -501,15 +501,23 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
 
-              // 🔥 Contenido en una Column alineada arriba
-              isHorizontal
-                  ? SingleChildScrollView(
-                physics: BouncingScrollPhysics(),
-                child: _buildContent(
-                  iconSize, titleFontSize, buttonHeight, buttonFontSize,
-                ),
-              )
-                  : _buildContent(iconSize, titleFontSize, buttonHeight, buttonFontSize),
+              // 🔥 Contenido principal con banner abajo
+              Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: isHorizontal
+                        ? SingleChildScrollView(
+                      physics: BouncingScrollPhysics(),
+                      child: _buildContent(
+                        iconSize, titleFontSize, buttonHeight, buttonFontSize,
+                      ),
+                    )
+                        : _buildContent(iconSize, titleFontSize, buttonHeight, buttonFontSize),
+                  ),
+                  BannerAdWidget(), // 🔥 Banner de AdMob fijo abajo
+                ],
+              ),
             ],
           ),
         );

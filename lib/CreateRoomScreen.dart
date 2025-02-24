@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import 'banner_ad_widget.dart';
 import 'main.dart';
 import 'top_bar.dart'; // 🔥 Importar el TopBar
 
@@ -125,8 +126,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       onWillPop: () async {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                MainScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
@@ -139,31 +139,46 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           preferredSize: Size.fromHeight(60),
           child: SafeArea(child: TopBar()),
         ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            bool isHorizontal = constraints.maxWidth > constraints.maxHeight;
-
-            return Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage("assets/background.png"),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.6), BlendMode.darken),
+        body: Stack(
+          children: [
+            /// 🔥 Fondo de pantalla fijo sin cambios de tamaño
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage("assets/background.png"),
+                    fit: BoxFit.cover,
+                    colorFilter: ColorFilter.mode(
+                        Colors.black.withOpacity(0.6), BlendMode.darken),
+                  ),
                 ),
               ),
-              child: isHorizontal
-                  ? SingleChildScrollView( // 🔥 Solo hay scroll en horizontal
-                physics: BouncingScrollPhysics(),
-                child: _buildContent(),
-              )
-                  : _buildContent(), // 🔥 En vertical no hay scroll
-            );
-          },
+            ),
+
+            /// 🔥 Contenido principal + banner
+            Column(
+              children: [
+                /// 🔥 Contenido expandible sin afectar el fondo
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: BouncingScrollPhysics(),
+                    child: _buildContent(),
+                  ),
+                ),
+
+                /// 🔥 Banner AdMob con tamaño fijo
+                SizedBox(
+                  height: 50, // 🔥 Espacio reservado para el banner
+                  child: BannerAdWidget(),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
+
 
   /// 🔥 Contenido de la pantalla (se reutiliza en ambas vistas)
   Widget _buildContent() {
