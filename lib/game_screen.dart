@@ -265,16 +265,21 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
   /// 🔥 Muestra un emoticono flotante en el centro con texto más pequeño y saltos de línea
   void _showFloatingEmoji(String emojiMessage) {
+    if (!mounted) return; // 🔥 Verifica si el widget aún está en el árbol
+
     setState(() {
       floatingEmojis.add(emojiMessage);
     });
 
     Future.delayed(Duration(seconds: 3), () {
-      setState(() {
-        floatingEmojis.remove(emojiMessage);
-      });
+      if (mounted) { // 🔥 Verifica antes de llamar a setState
+        setState(() {
+          floatingEmojis.remove(emojiMessage);
+        });
+      }
     });
   }
+
 
   /// 🔥 Construye la animación de los emoticonos con texto pequeño y salto de línea
   Widget _buildFloatingEmoji(String emojiMessage) {
@@ -335,10 +340,12 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             // 🔥 Esperar 2 segundos antes de actualizar `isWaiting`
             //await Future.delayed(Duration(seconds: 2));
 
-            setState(() {
-              isWaiting = false;
-              opponentUsername = opponent; // Guarda el nombre del oponente
-            });
+            if (mounted) {
+              setState(() {
+                isWaiting = false;
+                opponentUsername = opponent;
+              });
+            }
 
             return; // Salimos del bucle
           } else {
@@ -427,10 +434,12 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          myNumber = data['my_number']?.toString() ?? "Desconocido";
-          maxDigits = myNumber.length; // 🔥 Ajustar maxDigits al tamaño del número secreto
-        });
+        if (mounted) {
+          setState(() {
+            myNumber = data['my_number']?.toString() ?? "Desconocido";
+            maxDigits = myNumber.length;
+          });
+        }
       } else {
         print("❌ Error al obtener mi número: ${response.body}");
       }
@@ -508,6 +517,279 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       },
     ) ?? false;
   }
+
+  void _showAdvantagesBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)), // 🔥 Esquinas redondeadas
+      ),
+      backgroundColor: Colors.black87, // 🔥 Fondo oscuro
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // 🔥 Solo ocupar el espacio necesario
+            children: [
+              Text(
+                "Ventajas Disponibles",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              SizedBox(height: 10),
+
+              // 🔥 Lista de ventajas con la lógica añadida
+              _advantageOption(
+                context,
+                Icons.visibility,
+                "Revelar un número",
+                "Muestra un número correcto aleatorio",
+                _revealOpponentNumber, // 🔥 Llamamos a la función de revelar número
+              ),
+              _advantageOption(
+                context,
+                Icons.lightbulb_outline,
+                "Pista extra",
+                "Te da una pista sobre la posición correcta",
+                _getHintCorrectPosition, // Llama a la función cuando se seleccione
+              ),
+              _advantageOption(
+                context,
+                Icons.undo,
+                "Repetir intento",
+                "Te permite volver a intentar sin penalización",
+                    () => print("Repetir intento seleccionado"), // TODO: Implementar lógica
+              ),
+              _advantageOption(
+                context,
+                Icons.block,
+                "Bloquear pista",
+                "Impide que tu oponente reciba una pista",
+                    () => print("Bloquear pista seleccionada"), // TODO: Implementar lógica
+              ),
+
+              SizedBox(height: 15),
+              TextButton(
+                onPressed: () => Navigator.pop(context), // 🔥 Cerrar BottomSheet
+                child: Text("Cerrar", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 🔥 Widget para representar cada opción del BottomSheet con su acción específica
+  Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.amberAccent), // Icono a la izquierda
+      title: Text(title, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+      subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
+      onTap: () {
+        Navigator.pop(context); // 🔥 Cerrar el BottomSheet antes de ejecutar la ventaja
+        onTap();
+      },
+    );
+  }
+
+  void _revealOpponentNumber() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://109.123.248.19:4000/reveal-number/$roomId/$username'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String revealedDigit = data['digit']?.toString() ?? "❓"; // 🔥 Obtener el dígito revelado
+
+        // 🔥 Mostrar el dígito en un SnackBar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("🔍 Un dígito del número de tu oponente es: $revealedDigit"),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      } else {
+        throw Exception("Error al obtener el número del oponente.");
+      }
+    } catch (e) {
+      print("❌ Error en la solicitud de revelar número: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("❌ No se pudo revelar el número."),
+        ),
+      );
+    }
+  }
+
+
+  Future<void> _getHintCorrectPosition() async {
+    TextEditingController _numberController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.black87,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 🔥 Botón de Cerrar arriba a la derecha
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: Icon(Icons.close, color: Colors.white54, size: 24),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+
+                // 🔥 Ícono superior
+                Icon(Icons.search, color: Colors.blueAccent, size: 50),
+                SizedBox(height: 10),
+
+                // 🔥 Título atractivo
+                Text(
+                  "Busca un número",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 10),
+
+                // 🔥 Input de número
+                TextField(
+                  controller: _numberController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontSize: 22),
+                  decoration: InputDecoration(
+                    hintText: "Ingresa un dígito (0-9)",
+                    hintStyle: TextStyle(color: Colors.white54),
+                    counterText: "",
+                    filled: true,
+                    fillColor: Colors.grey[900],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 15),
+
+                // 🔥 Botón de buscar
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  onPressed: () {
+                    String digit = _numberController.text.trim();
+                    if (digit.isEmpty || !RegExp(r'^[0-9]$').hasMatch(digit)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("❌ Ingresa un dígito válido (0-9)")),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context); // Cierra el diálogo antes de llamar a la API
+                    _getHintForDigit(digit);
+                  },
+                  child: Text(
+                    "Buscar",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 🔥 **Función para obtener la pista llamando a la API**
+  void _getHintForDigit(String digit) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://109.123.248.19:4000/hint-correct-position/$roomId/$username?digit=$digit'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String message;
+        Color bgColor;
+
+        if (data["found"] == true) {
+          message = "📍 El número ${data["digit"]} está en la posición ${data["position"] + 1}.";
+          bgColor = Colors.green.withOpacity(0.8); // ✅ Verde claro transparente
+        } else {
+          message = "❌ El número $digit NO está en el número secreto del oponente.";
+          bgColor = Colors.red.withOpacity(0.8); // ✅ Rojo claro transparente
+        }
+
+        // 🔥 Mostrar el resultado en un **diálogo moderno**
+        showDialog(
+          context: context,
+          builder: (context) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: bgColor,
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      data["found"] == true ? Icons.check_circle : Icons.cancel,
+                      color: Colors.white,
+                      size: 50,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      "Resultado",
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 18, color: Colors.white70),
+                    ),
+                    SizedBox(height: 15),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text("Cerrar", style: TextStyle(color: Colors.white, fontSize: 18)),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ No se pudo obtener la pista.")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error al obtener pista: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Error al conectar con el servidor.")),
+      );
+    }
+  }
+
+
+
+
 
 
 
@@ -599,31 +881,61 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             Column(
               children: [
                 // 🔥 Fila debajo del AppBar para mostrar el número secreto
+                // 🔥 Fila debajo del AppBar para mostrar el número secreto con icono de ventajas
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.black,
                     border: Border(
                       bottom: BorderSide(
-                        color: Colors.white12, // 🔥 Color sutil (cambia si quieres)
-                        width: 1, // 🔥 Grosor del borde fino
+                        color: Colors.white12, // 🔥 Borde sutil
+                        width: 1,
                       ),
                     ),
                   ),
                   padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.start, // 🔥 Alineado a la izquierda
                     children: [
-                      Text(
-                        "Tu número secreto: ",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      // 🔥 Icono de ventajas interactivo
+                      GestureDetector(
+                        onTap: () => _showAdvantagesBottomSheet(context), // 🔥 Mostrar BottomSheet al tocar
+                        child: Icon(
+                          Icons.star, // Ícono de ventajas
+                          color: Colors.amberAccent, // Color amarillo brillante
+                          size: 24, // Tamaño del icono
+                        ),
                       ),
-                      Text(
-                        myNumber,
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                      SizedBox(width: 10), // Espaciado entre icono y texto
+
+                      // 🔥 Textos dentro de un Expanded para que se ajusten bien
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center, // Centrar los textos
+                          children: [
+                            Text(
+                              "Tu número secreto: ",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              myNumber,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
+
+
 
 
                 Expanded(
