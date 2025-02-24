@@ -1,19 +1,31 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-
+import 'package:flutter/services.dart';
+import 'top_bar.dart'; // 🔥 Importar el TopBar
 import 'CreateRoomScreen.dart';
 import 'LoginScreen.dart';
 import 'RegisterScreen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔥 Ocultar SOLO la barra de estado (mantiene la barra de navegación)
+  _hideStatusBar(); // Ocultar la barra de estado al iniciar
+
   runApp(MyApp());
+}
+void _hideStatusBar() {
+  SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: [SystemUiOverlay.bottom], // Mantiene visible la barra de navegación
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -24,22 +36,35 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: Colors.black, // 🔥 Fondo negro moderno
         appBarTheme: AppBarTheme(
-          backgroundColor: Colors.black, // 🔥 AppBar negro
+          backgroundColor: Colors.black,
           titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
-          iconTheme: IconThemeData(color: Colors.white), // Íconos blancos
+          iconTheme: IconThemeData(color: Colors.white),
         ),
       ),
       initialRoute: '/',
       routes: {
         '/': (context) => MainScreen(),
         '/game': (context) => GameScreenGame(),
-        '/login': (context) => LoginScreen(), // ✅ Agregamos la ruta del login
-        '/register': (context) => RegisterScreen(), // ✅ Ruta de registro
-        '/create-room': (context) => CreateRoomScreen(), // ✅ Agregar esta línea
+        '/login': (context) => LoginScreen(),
+        '/register': (context) => RegisterScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/create-room') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          final username = args?['username'] ?? "Guest_XXXXXXX"; // Fallback username
+
+          return MaterialPageRoute(
+            builder: (context) => CreateRoomScreen(username: username),
+          );
+        }
+        return null; // Let the framework handle unknown routes
       },
     );
   }
 }
+
+
+
 
 class MainScreen extends StatefulWidget {
   @override
@@ -53,12 +78,22 @@ class _MainScreenState extends State<MainScreen> {
   bool _snackbarShown = false;
   String? _snackbarMessage;
   bool _isJoining = false; // 🔥 Nuevo estado para deshabilitar el botón
-
+  String _username = "Guest_XXXXXXX"; // Valor por defecto
+  Timer? _hideTimer;
 
   @override
   void initState() {
     super.initState();
     _loadLastSession(); // 🔥 Cargar última sesión guardada
+    _loadUsername(); // Cargar el nombre al iniciar
+    _startHideTimer();
+  }
+
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(Duration(seconds: 3), () {
+      _hideStatusBar(); // 🔥 Vuelve a ocultar la barra de estado
+    });
   }
 
   // 🔥 Cargar los datos guardados en SharedPreferences
@@ -93,7 +128,8 @@ class _MainScreenState extends State<MainScreen> {
           body: jsonEncode(
               {"roomId": roomId, "username": username, "digits": digits}),
         ),
-        Future.delayed(Duration(seconds: 5), () => throw TimeoutException(
+        Future.delayed(Duration(seconds: 5), () =>
+        throw TimeoutException(
             "Tiempo de espera agotado")),
       ]);
 
@@ -209,30 +245,98 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  // 🔥 Cargar el nombre guardado en SharedPreferences o generar uno aleatorio
+  Future<void> _loadUsername() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? savedUsername = prefs.getString("lastUsername");
 
-  Future<void> _joinRoom(String roomId) async {
-    if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text("❌ Ingresá un nombre antes de unirte a una sala.")),
-      );
-      return;
+    // Si no hay usuario guardado, generar un Guest solo una vez
+    if (savedUsername == null) {
+      savedUsername = await _generateGuestUsername();
     }
 
+    setState(() {
+      _username = savedUsername!;
+    });
+  }
+
+  /// 🔥 Generar un Guest solo si no existe ya un usuario guardado
+  Future<String> _generateGuestUsername() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String newGuest = "Guest_${Random().nextInt(900000) + 100000}";
+
+    await prefs.setString("lastUsername", newGuest);
+    return newGuest;
+  }
+
+  // 🔥 Genera un nombre aleatorio Guest_XXXXXXX
+  String _generateRandomGuestName() {
+    int randomNumber = Random().nextInt(9999999);
+    return "Guest_$randomNumber";
+  }
+
+  // 🔥 Guardar el nombre editado en SharedPreferences
+  Future<void> _saveUsername(String newUsername) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString("lastUsername", newUsername);
+    setState(() {
+      _username = newUsername;
+    });
+  }
+
+  // 🔥 Mostrar diálogo para editar nombre
+  void _editUsernameDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Editar Nombre"),
+          content: TextField(
+            controller: _nameController,
+            decoration: InputDecoration(hintText: "Ingresa tu nuevo nombre"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Cerrar el diálogo
+              },
+              child: Text("Cancelar"),
+            ),
+            TextButton(
+              onPressed: () {
+                String newUsername = _nameController.text.trim();
+                if (newUsername.isNotEmpty) {
+                  _saveUsername(newUsername);
+                  Navigator.pop(context); // Cerrar el diálogo
+                }
+              },
+              child: Text("Guardar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  Future<void> _joinRoom(String roomId) async {
     setState(() {
       _isJoining = true;
     });
 
     try {
-      // 🔥 Obtener la información de la sala para determinar la cantidad de dígitos correcta
+      // 🔥 Cargar el nombre de usuario desde SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String username = prefs.getString("lastUsername") ?? "Guest_XXXXXXX";
+
+      // 🔥 Verificar la información de la sala antes de unirse
       final roomInfoResponse = await http.get(
         Uri.parse('http://109.123.248.19:4000/room-info/$roomId'),
       );
 
       if (roomInfoResponse.statusCode != 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("❌ La sala no existe o no tiene jugadores aún.")),
+          SnackBar(content: Text("❌ La sala no existe o no tiene jugadores aún.")),
         );
         setState(() {
           _isJoining = false;
@@ -241,17 +345,16 @@ class _MainScreenState extends State<MainScreen> {
       }
 
       final roomData = jsonDecode(roomInfoResponse.body);
-      int roomDigits = roomData["digits"]; // ✅ Ahora obtenemos correctamente los dígitos de la sala
+      int roomDigits = roomData["digits"]; // ✅ Se obtiene la cantidad de dígitos correcta
 
-      // 🔥 Intentamos unirnos con los dígitos correctos
+      // 🔥 Intentamos unirnos con los datos correctos
       final response = await http.post(
         Uri.parse('http://109.123.248.19:4000/join-room'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "roomId": roomId,
-          "username": _nameController.text,
+          "username": username, // ✅ Ahora usa el nombre desde SharedPreferences
           "digits": roomDigits,
-          // ✅ Se usa la cantidad de dígitos correcta obtenida de la API
         }),
       );
 
@@ -260,12 +363,12 @@ class _MainScreenState extends State<MainScreen> {
           SnackBar(content: Text("❌ La sala está llena, intenta otra.")),
         );
       } else if (response.statusCode == 200) {
-        await _saveLastSession(_nameController.text, roomId);
+        await _saveLastSession(username, roomId);
         Navigator.pushNamed(
           context,
           '/game',
           arguments: {
-            'username': _nameController.text,
+            'username': username,
             'roomId': roomId,
             'digits': roomDigits
           },
@@ -283,6 +386,7 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
   }
+
 
   void _showRoomsBottomSheet(List<dynamic> rooms) {
     showModalBottomSheet(
@@ -362,215 +466,167 @@ class _MainScreenState extends State<MainScreen> {
   }
 
 
-  void _createRoom() async {
-    if (_nameController.text.isEmpty || _roomController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(
-            "❌ Ingresá un nombre y un ID de sala antes de crearla.")),
-      );
-      return;
-    }
-
-    int? digits = int.tryParse(_digitsController.text);
-    if (digits == null || digits < 4 || digits > 7) {
-      digits = 4; // 🔥 Si es inválido, se asigna el valor por defecto de 4
-    }
-
-    String roomId = _roomController.text
-        .trim(); // 🔥 Elimina espacios en blanco
-    String username = _nameController.text
-        .trim(); // 🔥 Elimina espacios en blanco
-
-    setState(() {
-      _isJoining = true;
-    });
-
-    try {
-      // 🔥 PRIMERO VERIFICAMOS SI LA SALA YA EXISTE
-      final checkRoomResponse = await http.get(
-        Uri.parse('http://109.123.248.19:4000/room-info/$roomId'),
-      );
-
-      if (checkRoomResponse.statusCode == 200) {
-        // 🚫 La sala ya existe, mostrar mensaje de error y salir
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("❌ La sala '$roomId' ya existe. Usa otro ID.")),
-        );
-        setState(() {
-          _isJoining = false;
-        });
-        return;
-      }
-
-      // 🔥 SI NO EXISTE, PROCEDER A CREARLA
-      final response = await http.post(
-        Uri.parse('http://109.123.248.19:4000/create-room'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "roomId": roomId,
-          "username": username,
-          "digits": digits,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        int roomDigits = responseData["digits"] ??
-            digits; // 🔥 Asegurar que tomamos el valor correcto
-
-        print("✅ Sala creada con éxito. Configurada para $roomDigits dígitos.");
-
-        await _saveLastSession(username, roomId);
-        Navigator.pushNamed(
-          context,
-          '/game',
-          arguments: {
-            'username': username,
-            'roomId': roomId,
-            'digits': roomDigits
-          },
-        );
-      } else {
-        print("❌ Error al crear la sala: ${response.body}");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(
-              "❌ No se pudo crear la sala. Intenta con otro ID.")),
-        );
-      }
-    } catch (e) {
-      print("❌ Error en la creación de la sala: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Ocurrió un error al crear la sala.")),
-      );
-    } finally {
-      setState(() {
-        _isJoining = false;
-      });
-    }
-  }
-
-
-// 🔥 Método para crear la sala y meterte en la partida automáticamente
-  void _createRoomAndJoin(String roomId, int digits) async {
-    if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Ingresá un nombre antes de crear la sala.")),
-      );
-      return;
-    }
-
-    setState(() {
-      _isJoining = true;
-    });
-
-    try {
-      final response = await Future.any([
-        http.post(
-          Uri.parse('http://109.123.248.19:4000/create-room'),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({
-            "roomId": roomId,
-            "username": _nameController.text,
-            "digits": digits
-          }),
-        ),
-        Future.delayed(Duration(seconds: 5), () => throw TimeoutException(
-            "Tiempo de espera agotado")),
-      ]);
-
-      if (response is http.Response && response.statusCode == 200) {
-        print("✅ Sala creada con éxito. Uniendo a la partida...");
-
-        // 🔥 Guardar la sesión
-        await _saveLastSession(_nameController.text, roomId);
-
-        // 🔥 Redirigir al juego
-        Navigator.pushNamed(
-          context,
-          '/game',
-          arguments: {'username': _nameController.text, 'roomId': roomId},
-        );
-      } else {
-        print("❌ Error al crear la sala: ${response.body}");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ No se pudo crear la sala.")),
-        );
-      }
-    } catch (e) {
-      print("❌ Error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(
-            "❌ La solicitud tardó demasiado. Intenta nuevamente.")),
-      );
-    } finally {
-      setState(() {
-        _isJoining = false;
-      });
-    }
-  }
-
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/background.png"),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
+    return GestureDetector(
+      onTap: _startHideTimer, // 🔥 Reiniciar temporizador al tocar
+      onPanUpdate: (details) => _startHideTimer(), // 🔥 Reiniciar al deslizar
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // 🔥 Fondo de pantalla
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/background.png"),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                      Colors.black.withOpacity(0.6), BlendMode.darken),
+                ),
               ),
             ),
-          ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
+
+            // 🔥 TopBar pegado arriba del todo sin `Positioned` dentro del widget
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: TopBar(),
+            ),
+
+            // 🔥 Contenido completamente centrado
+            Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.videogame_asset_rounded, color: Colors.white, size: 100),
+                  Icon(Icons.videogame_asset_rounded,
+                      color: Colors.white, size: 100),
                   SizedBox(height: 20),
                   Text(
                     "¡Adivina el Número!",
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                   SizedBox(height: 30),
 
-                  // 🔥 Botón de Login que redirige a la pantalla de Login
-                  ElevatedButton(
+                  // 🔥 BOTÓN ESTILO EXACTO DE LA IMAGEN
+                  _buildStyledButton(
+                    title: "Crear Sala",
+                    subtitle: "Multijugador",
+                    baseColor: Colors.purpleAccent,
+                    darkColor: Colors.deepPurple,
+                    icon: Icons.meeting_room,
+                    // 👑 Icono grande a la derecha
                     onPressed: () {
-                      Navigator.pushNamed(context, '/login'); // ✅ Redirige a LoginScreen
+                      Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              CreateRoomScreen(username: _username),
+                          transitionDuration: Duration.zero, // 🔥 Sin animación
+                          reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
+                        ),
+                      );
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      padding: EdgeInsets.symmetric(vertical: 14, horizontal: 30),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: Text("Iniciar Sesión", style: TextStyle(fontSize: 18, color: Colors.white)),
-                  ),
 
-                  SizedBox(height: 20),
-
-                  ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/create-room'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent),
-                    child: Text("Crear Sala", style: TextStyle(fontSize: 18, color: Colors.black)),
                   ),
 
                   SizedBox(height: 10),
-                  ElevatedButton(
+
+                  _buildStyledButton(
+                    title: "Listar Salas",
+                    subtitle: "Partidas activas",
+                    baseColor: Colors.orangeAccent,
+                    darkColor: Colors.deepOrange,
+                    icon: Icons.list,
+                    // 📋 Icono grande a la derecha
                     onPressed: () => _showAvailableRooms(context),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent),
-                    child: Text("Listar Salas", style: TextStyle(fontSize: 18, color: Colors.black)),
                   ),
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 🔥 Widget de botón con estilo de dos colores y línea separadora
+  Widget _buildStyledButton({
+    required String title,
+    required String subtitle,
+    required Color baseColor, // 🎨 Color principal
+    required IconData icon,
+    required VoidCallback onPressed, required MaterialColor darkColor,
+  }) {
+    return Container(
+      width: 280, // 🔥 Tamaño compacto
+      height: 60, // 🔥 Altura ajustada
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10), // 🔥 Bordes suaves
+      ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          padding: EdgeInsets.zero, // 🔥 Sin padding para que funcione el `Row`
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
+          elevation: 5,
+        ),
+        child: Row(
+          children: [
+            // 🔥 SECCIÓN IZQUIERDA (Texto y subtítulo)
+            Expanded(
+              flex: 2,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 15),
+                decoration: BoxDecoration(
+                  color: baseColor, // 🔥 Color principal del botón
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(10),
+                    bottomLeft: Radius.circular(10),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🔥 SECCIÓN DERECHA (ICONO EN FONDO UN POCO MÁS OSCURO)
+            Expanded(
+              flex: 1,
+              child: Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  color: baseColor.withOpacity(0.8), // 🔥 Un poco más oscuro
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(10),
+                    bottomRight: Radius.circular(10),
+                  ),
+                ),
+                child: Center(
+                  child: Icon(icon, size: 30, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

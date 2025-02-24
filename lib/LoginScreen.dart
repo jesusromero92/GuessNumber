@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:guess_number/user_data.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
 
@@ -14,7 +16,26 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  // 🔥 Función para iniciar sesión con API
+  @override
+  void initState() {
+    super.initState();
+    _checkIfLoggedIn(); // 🔥 Verificar si el usuario ya está logueado
+  }
+
+  // 🔥 Verificar si el usuario ya está logueado y redirigirlo
+  Future<void> _checkIfLoggedIn() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isLogged = prefs.getBool("isLogged") ?? false;
+
+    if (isLogged) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => MainScreen()),
+      );
+    }
+  }
+
+
   Future<void> loginUser() async {
     final String username = _usernameController.text.trim();
     final String password = _passwordController.text.trim();
@@ -44,12 +65,8 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text("✅ ${data["message"]}")),
         );
 
-        // 🔥 Redirigir al juego o a otra pantalla
-        // 🔥 Redirigir a MainScreen después del login
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => MainScreen()),
-        );
+        await UserData.setUsername(username); // 🔥 Guardar usuario logueado
+        Navigator.pop(context, true); // 🔥 Devuelve `true` para recargar `TopBar`
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("❌ ${data["error"]}")),
@@ -66,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

@@ -1,45 +1,60 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math';
+import 'main.dart';
+import 'top_bar.dart'; // 🔥 Importar el TopBar
 
 class CreateRoomScreen extends StatefulWidget {
+  final String username; // ✅ Add this field to store the username
+
+  const CreateRoomScreen({Key? key, required this.username}) : super(key: key); // ✅ Named parameter
+
   @override
   _CreateRoomScreenState createState() => _CreateRoomScreenState();
 }
 
 class _CreateRoomScreenState extends State<CreateRoomScreen> {
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _roomController = TextEditingController();
   final TextEditingController _digitsController = TextEditingController();
   bool _isJoining = false;
+  String _username = "Guest_XXXXXXX"; // Nombre por defecto
 
   @override
   void initState() {
     super.initState();
-    _loadLastSession();
+    _loadUsername();
   }
 
-  Future<void> _loadLastSession() async {
+  /// 🔥 Cargar el nombre de usuario guardado
+  Future<void> _loadUsername() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? savedUsername = prefs.getString("lastUsername");
+
+    if (savedUsername == null) {
+      savedUsername = await _generateGuestUsername(); // Generar un nuevo Guest
+    }
+
     setState(() {
-      _nameController.text = prefs.getString("lastUsername") ?? "";
-      _roomController.text = prefs.getString("lastRoomId") ?? "";
+      _username = savedUsername!;
     });
   }
 
-  Future<void> _saveLastSession(String username, String roomId) async {
+  /// 🔥 Genera un nombre aleatorio Guest_XXXXXX si no hay usuario guardado
+  Future<String> _generateGuestUsername() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString("lastUsername", username);
-    await prefs.setString("lastRoomId", roomId);
+    String newGuest = "Guest_${Random().nextInt(900000) + 100000}";
+    await prefs.setString("lastUsername", newGuest);
+    return newGuest;
   }
 
+  /// 🔥 Crear Sala
   void _createRoom() async {
-    if (_nameController.text.isEmpty || _roomController.text.isEmpty) {
+    if (_roomController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Ingresá un nombre y un ID de sala antes de crearla.")),
+        SnackBar(content: Text("❌ Debes ingresar un ID de sala.")),
       );
       return;
     }
@@ -50,7 +65,6 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
     }
 
     String roomId = _roomController.text.trim();
-    String username = _nameController.text.trim();
 
     setState(() {
       _isJoining = true;
@@ -63,11 +77,12 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({
             "roomId": roomId,
-            "username": username,
+            "username": _username, // 🔥 Se usa el usuario cargado
             "digits": digits,
           }),
         ),
-        Future.delayed(Duration(seconds: 15), () => throw TimeoutException("⏳ Tiempo de espera agotado")),
+        Future.delayed(Duration(seconds: 15), () => throw TimeoutException(
+            "⏳ Tiempo de espera agotado")),
       ]);
 
       if (response is http.Response && response.statusCode == 200) {
@@ -76,132 +91,176 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
 
         print("✅ Sala creada con éxito. Configurada para $roomDigits dígitos.");
 
-        await _saveLastSession(username, roomId);
         Navigator.pushNamed(
           context,
           '/game',
-          arguments: {'username': username, 'roomId': roomId, 'digits': roomDigits},
+          arguments: {
+            'username': _username,
+            'roomId': roomId,
+            'digits': roomDigits
+          },
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ No se pudo crear la sala. Intenta con otro ID.")),
+          SnackBar(content: Text(
+              "❌ No se pudo crear la sala. Intenta con otro ID.")),
         );
       }
     } catch (e) {
       print("❌ Error en la creación de la sala: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Ocurrió un error al crear la sala o la solicitud tardó demasiado.")),
+        SnackBar(content: Text(
+            "❌ Ocurrió un error al crear la sala o la solicitud tardó demasiado.")),
       );
     } finally {
       setState(() {
-        _isJoining = false; // 🔥 Se reactiva el botón después de 5 segundos o si hubo error
+        _isJoining = false;
       });
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage("assets/background.png"),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
+    return WillPopScope(
+      onWillPop: () async {
+        // 🔥 Interceptar la tecla de retroceso y hacer una navegación sin animaciones
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                MainScreen(),
+            transitionDuration: Duration.zero, // 🔥 Sin animación
+            reverseTransitionDuration: Duration
+                .zero, // 🔥 Sin animación al volver
+          ),
+        );
+        return false; // 🔥 Evita el comportamiento predeterminado
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // 🔥 Fondo de pantalla
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/background.png"),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                      Colors.black.withOpacity(0.6), BlendMode.darken),
+                ),
               ),
             ),
-          ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add_circle_outline, color: Colors.white, size: 100),
-                  SizedBox(height: 20),
-                  Text(
-                    "Crear Sala",
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  SizedBox(height: 30),
-                  TextField(
-                    controller: _nameController,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      hintText: "Nombre de usuario",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.person, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  TextField(
-                    controller: _roomController,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      hintText: "ID de Sala",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.meeting_room, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  TextField(
-                    controller: _digitsController,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.2),
-                      hintText: "Cantidad de dígitos (4-7)",
-                      hintStyle: TextStyle(color: Colors.white70),
-                      prefixIcon: Icon(Icons.pin, color: Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  ElevatedButton(
-                    onPressed: _isJoining ? null : _createRoom,
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: _isJoining ? Colors.grey : Colors.orangeAccent,
-                    ),
-                    child: _isJoining
-                        ? SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3),
-                    )
-                        : Text("Crear Sala", style: TextStyle(fontSize: 18, color: Colors.black)),
-                  ),
 
-                  SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text("Volver", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
-                  ),
-                ],
+            // 🔥 TopBar pegado arriba del todo
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: TopBar(),
+            ),
+
+            // 🔥 Contenido centrado
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_circle_outline, color: Colors.white,
+                        size: 100),
+                    SizedBox(height: 20),
+                    Text(
+                      "Crear Sala",
+                      style: TextStyle(fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
+                    ),
+                    SizedBox(height: 30),
+
+                    // 🔥 ID de Sala
+                    TextField(
+                      controller: _roomController,
+                      style: TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.2),
+                        hintText: "ID de Sala",
+                        hintStyle: TextStyle(color: Colors.white70),
+                        prefixIcon: Icon(
+                            Icons.meeting_room, color: Colors.white),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 15),
+
+                    // 🔥 Cantidad de Dígitos
+                    TextField(
+                      controller: _digitsController,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.2),
+                        hintText: "Cantidad de dígitos (4-7)",
+                        hintStyle: TextStyle(color: Colors.white70),
+                        prefixIcon: Icon(Icons.pin, color: Colors.white),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 15),
+
+                    // 🔥 Botón Crear Sala
+                    ElevatedButton(
+                      onPressed: _isJoining ? null : _createRoom,
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 40, vertical: 15),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        backgroundColor: _isJoining ? Colors.grey : Colors
+                            .orangeAccent,
+                      ),
+                      child: _isJoining
+                          ? SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                            color: Colors.black, strokeWidth: 3),
+                      )
+                          : Text("Crear Sala",
+                          style: TextStyle(fontSize: 18, color: Colors.black)),
+                    ),
+
+                    SizedBox(height: 10),
+
+                    // 🔥 Botón Volver sin animaciones
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pushReplacement(
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation,
+                                secondaryAnimation) => MainScreen(),
+                            transitionDuration: Duration.zero,
+                            // 🔥 Sin animación
+                            reverseTransitionDuration: Duration
+                                .zero, // 🔥 Sin animación al volver
+                          ),
+                        );
+                      },
+                      child: Text("Volver", style: TextStyle(
+                          color: Colors.redAccent, fontSize: 18)),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
