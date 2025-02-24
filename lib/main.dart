@@ -26,6 +26,9 @@ void _hideStatusBar() {
     SystemUiMode.manual,
     overlays: [SystemUiOverlay.bottom], // Mantiene visible la barra de navegación
   );
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp, // 🔥 Solo modo vertical
+  ]);
 }
 
 class MyApp extends StatelessWidget {
@@ -468,108 +471,130 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _startHideTimer, // 🔥 Reiniciar temporizador al tocar
-      onPanUpdate: (details) => _startHideTimer(), // 🔥 Reiniciar al deslizar
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // 🔥 Fondo de pantalla
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage("assets/background.png"),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                      Colors.black.withOpacity(0.6), BlendMode.darken),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isHorizontal = constraints.maxWidth > constraints.maxHeight;
+        final bool isSmallScreen = constraints.maxWidth < 1000;
+
+        // 🔥 Depuración visual
+        debugPrint("📱 Ancho: ${constraints.maxWidth}, Alto: ${constraints.maxHeight}");
+        debugPrint("🛠️ Horizontal: $isHorizontal, Pequeña: $isSmallScreen");
+
+        // 🔥 Ajustes dinámicos
+        final double iconSize = isHorizontal && isSmallScreen ? 50 : 100;
+        final double titleFontSize = isHorizontal && isSmallScreen ? 20 : 32;
+        final double buttonHeight = isHorizontal && isSmallScreen ? 40 : 60;
+        final double buttonFontSize = isHorizontal && isSmallScreen ? 12 : 18;
+
+        return GestureDetector(
+          onTap: _startHideTimer, // 🔥 Reiniciar temporizador al tocar
+          onPanUpdate: (details) => _startHideTimer(), // 🔥 Reiniciar al deslizar
+          child: Scaffold(
+            body: Stack(
+              children: [
+                // 🔥 Fondo de pantalla
+                Container(
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage("assets/background.png"),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(
+                          Colors.black.withOpacity(0.6), BlendMode.darken),
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // 🔥 TopBar pegado arriba del todo sin `Positioned` dentro del widget
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: TopBar(),
-            ),
+                // 🔥 TopBar pegado arriba del todo sin `Positioned` dentro del widget
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: TopBar(),
+                ),
 
-            // 🔥 Contenido completamente centrado
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.videogame_asset_rounded,
-                      color: Colors.white, size: 100),
-                  SizedBox(height: 20),
-                  Text(
-                    "¡Adivina el Número!",
-                    style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  SizedBox(height: 30),
-
-                  // 🔥 BOTÓN ESTILO EXACTO DE LA IMAGEN
-                  _buildStyledButton(
-                    title: "Crear Sala",
-                    subtitle: "Multijugador",
-                    baseColor: Colors.purpleAccent,
-                    darkColor: Colors.deepPurple,
-                    icon: Icons.meeting_room,
-                    // 👑 Icono grande a la derecha
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) =>
-                              CreateRoomScreen(username: _username),
-                          transitionDuration: Duration.zero, // 🔥 Sin animación
-                          reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
+                // 🔥 Contenido completamente centrado
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.videogame_asset_rounded,
+                          color: Colors.white, size: iconSize), // 🔥 Ícono ajustado
+                      SizedBox(height: 20),
+                      Text(
+                        "¡Adivina el Número!",
+                        style: TextStyle(
+                          fontSize: titleFontSize, // 🔥 Texto ajustado
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                      );
-                    },
+                      ),
+                      SizedBox(height: 30),
 
+                      // 🔥 BOTÓN ESTILO EXACTO DE LA IMAGEN (Ajustado para pantallas pequeñas)
+                      _buildStyledButton(
+                        title: "Crear Sala",
+                        subtitle: "Multijugador",
+                        baseColor: Colors.purpleAccent,
+                        darkColor: Colors.deepPurple,
+                        icon: Icons.meeting_room,
+                        buttonHeight: buttonHeight, // 🔥 Ajuste dinámico del botón
+                        fontSize: buttonFontSize, // 🔥 Ajuste dinámico del texto
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            PageRouteBuilder(
+                              pageBuilder: (context, animation, secondaryAnimation) =>
+                                  CreateRoomScreen(username: _username),
+                              transitionDuration: Duration.zero, // 🔥 Sin animación
+                              reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
+                            ),
+                          );
+                        },
+                      ),
+
+                      SizedBox(height: 10),
+
+                      _buildStyledButton(
+                        title: "Listar Salas",
+                        subtitle: "Partidas activas",
+                        baseColor: Colors.orangeAccent,
+                        darkColor: Colors.deepOrange,
+                        icon: Icons.list,
+                        buttonHeight: buttonHeight, // 🔥 Ajuste dinámico del botón
+                        fontSize: buttonFontSize, // 🔥 Ajuste dinámico del texto
+                        onPressed: () => _showAvailableRooms(context),
+                      ),
+                    ],
                   ),
-
-                  SizedBox(height: 10),
-
-                  _buildStyledButton(
-                    title: "Listar Salas",
-                    subtitle: "Partidas activas",
-                    baseColor: Colors.orangeAccent,
-                    darkColor: Colors.deepOrange,
-                    icon: Icons.list,
-                    // 📋 Icono grande a la derecha
-                    onPressed: () => _showAvailableRooms(context),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  /// 🔥 Widget de botón con estilo de dos colores y línea separadora
+  /// 🔥 Widget de botón con tamaño dinámico según la pantalla
   Widget _buildStyledButton({
     required String title,
     required String subtitle,
-    required Color baseColor, // 🎨 Color principal
+    required Color baseColor,
+    required Color darkColor,
     required IconData icon,
-    required VoidCallback onPressed, required MaterialColor darkColor,
+    required VoidCallback onPressed,
+    double buttonHeight = 60, // 🔥 Se ajustará si la pantalla es pequeña
+    double fontSize = 18, // 🔥 Se ajustará si la pantalla es pequeña
   }) {
     return Container(
-      width: 280, // 🔥 Tamaño compacto
-      height: 60, // 🔥 Altura ajustada
+      width: 280,
+      height: buttonHeight, // 🔥 Altura ajustable
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10), // 🔥 Bordes suaves
+        borderRadius: BorderRadius.circular(10),
       ),
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          padding: EdgeInsets.zero, // 🔥 Sin padding para que funcione el `Row`
+          padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -583,7 +608,7 @@ class _MainScreenState extends State<MainScreen> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 15),
                 decoration: BoxDecoration(
-                  color: baseColor, // 🔥 Color principal del botón
+                  color: baseColor,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(10),
                     bottomLeft: Radius.circular(10),
@@ -595,33 +620,35 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
+                      style: TextStyle(
+                        fontSize: fontSize, // 🔥 Tamaño de fuente ajustable
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                      style: TextStyle(fontSize: fontSize - 4, color: Colors.white70),
                     ),
                   ],
                 ),
               ),
             ),
 
-            // 🔥 SECCIÓN DERECHA (ICONO EN FONDO UN POCO MÁS OSCURO)
+            // 🔥 SECCIÓN DERECHA (ICONO EN FONDO MÁS OSCURO)
             Expanded(
               flex: 1,
               child: Container(
-                height: 60,
+                height: buttonHeight,
                 decoration: BoxDecoration(
-                  color: baseColor.withOpacity(0.8), // 🔥 Un poco más oscuro
+                  color: baseColor.withOpacity(0.8),
                   borderRadius: BorderRadius.only(
                     topRight: Radius.circular(10),
                     bottomRight: Radius.circular(10),
                   ),
                 ),
                 child: Center(
-                  child: Icon(icon, size: 30, color: Colors.white),
+                  child: Icon(icon, size: fontSize + 6, color: Colors.white),
                 ),
               ),
             ),
@@ -630,4 +657,5 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+
 }

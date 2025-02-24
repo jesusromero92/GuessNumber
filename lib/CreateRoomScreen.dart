@@ -81,7 +81,8 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
             "digits": digits,
           }),
         ),
-        Future.delayed(Duration(seconds: 15), () => throw TimeoutException(
+        Future.delayed(Duration(seconds: 15), () =>
+        throw TimeoutException(
             "⏳ Tiempo de espera agotado")),
       ]);
 
@@ -123,19 +124,18 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // 🔥 Interceptar la tecla de retroceso y hacer una navegación sin animaciones
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) =>
                 MainScreen(),
-            transitionDuration: Duration.zero, // 🔥 Sin animación
-            reverseTransitionDuration: Duration
-                .zero, // 🔥 Sin animación al volver
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
           ),
         );
-        return false; // 🔥 Evita el comportamiento predeterminado
+        return false;
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: false, // 🔥 Evita que la UI cambie al abrir el teclado
         body: Stack(
           children: [
             // 🔥 Fondo de pantalla
@@ -150,7 +150,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
               ),
             ),
 
-            // 🔥 TopBar pegado arriba del todo
+            // 🔥 TopBar pegado arriba
             Positioned(
               top: 0,
               left: 0,
@@ -158,104 +158,170 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
               child: TopBar(),
             ),
 
-            // 🔥 Contenido centrado
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_circle_outline, color: Colors.white,
-                        size: 100),
-                    SizedBox(height: 20),
-                    Text(
-                      "Crear Sala",
-                      style: TextStyle(fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
-                    SizedBox(height: 30),
+            // 🔥 Scroll para dispositivos pequeños
+            SingleChildScrollView(
+              physics: BouncingScrollPhysics(),
+              child: Container(
+                height: MediaQuery
+                    .of(context)
+                    .size
+                    .height, // 🔥 Ocupa toda la pantalla
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    bool isHorizontal = constraints.maxWidth >
+                        600; // 🔥 Detecta orientación
 
-                    // 🔥 ID de Sala
-                    TextField(
-                      controller: _roomController,
-                      style: TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.2),
-                        hintText: "ID de Sala",
-                        hintStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(
-                            Icons.meeting_room, color: Colors.white),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 15),
-
-                    // 🔥 Cantidad de Dígitos
-                    TextField(
-                      controller: _digitsController,
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.2),
-                        hintText: "Cantidad de dígitos (4-7)",
-                        hintStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(Icons.pin, color: Colors.white),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 15),
-
-                    // 🔥 Botón Crear Sala
-                    ElevatedButton(
-                      onPressed: _isJoining ? null : _createRoom,
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 15),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        backgroundColor: _isJoining ? Colors.grey : Colors
-                            .orangeAccent,
-                      ),
-                      child: _isJoining
-                          ? SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            color: Colors.black, strokeWidth: 3),
-                      )
-                          : Text("Crear Sala",
-                          style: TextStyle(fontSize: 18, color: Colors.black)),
-                    ),
-
-                    SizedBox(height: 10),
-
-                    // 🔥 Botón Volver sin animaciones
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushReplacement(
-                          PageRouteBuilder(
-                            pageBuilder: (context, animation,
-                                secondaryAnimation) => MainScreen(),
-                            transitionDuration: Duration.zero,
-                            // 🔥 Sin animación
-                            reverseTransitionDuration: Duration
-                                .zero, // 🔥 Sin animación al volver
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_circle_outline, color: Colors.white,
+                            size: isHorizontal ? 60 : 80),
+                        SizedBox(height: isHorizontal ? 10 : 15),
+                        Text(
+                          "Crear Sala",
+                          style: TextStyle(
+                            fontSize: isHorizontal ? 24 : 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                        );
-                      },
-                      child: Text("Volver", style: TextStyle(
-                          color: Colors.redAccent, fontSize: 18)),
-                    ),
-                  ],
+                        ),
+                        SizedBox(height: isHorizontal ? 15 : 20),
+
+                        // 🔥 Campo de ID de Sala
+                        TextField(
+                          controller: _roomController,
+                          style: TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.2),
+                            hintText: "ID de Sala",
+                            hintStyle: TextStyle(color: Colors.white70),
+                            prefixIcon: Icon(
+                                Icons.meeting_room, color: Colors.white),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 15),
+
+                        // 🔥 Campo de Cantidad de Dígitos
+                        TextField(
+                          controller: _digitsController,
+                          keyboardType: TextInputType.number,
+                          style: TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.2),
+                            hintText: "Cantidad de dígitos (4-7)",
+                            hintStyle: TextStyle(color: Colors.white70),
+                            prefixIcon: Icon(Icons.pin, color: Colors.white),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 15),
+
+                        if (isHorizontal)
+                        // 🔥 En horizontal, los botones están en fila
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // 🔥 Botón Volver
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pushReplacement(
+                                    PageRouteBuilder(
+                                      pageBuilder: (context, animation,
+                                          secondaryAnimation) => MainScreen(),
+                                      transitionDuration: Duration.zero,
+                                      reverseTransitionDuration: Duration.zero,
+                                    ),
+                                  );
+                                },
+                                child: Text("Volver", style: TextStyle(
+                                    color: Colors.redAccent, fontSize: 18)),
+                              ),
+
+                              SizedBox(width: 20), // Espacio entre los botones
+
+                              // 🔥 Botón Crear Sala
+                              ElevatedButton(
+                                onPressed: _isJoining ? null : _createRoom,
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 40, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                  backgroundColor: _isJoining
+                                      ? Colors.grey
+                                      : Colors.orangeAccent,
+                                ),
+                                child: _isJoining
+                                    ? SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.black, strokeWidth: 3),
+                                )
+                                    : Text("Crear Sala", style: TextStyle(
+                                    fontSize: 18, color: Colors.black)),
+                              ),
+                            ],
+                          )
+                        else
+                        // 🔥 En vertical, los botones están en columna
+                          Column(
+                            children: [
+                              // 🔥 Botón Crear Sala
+                              ElevatedButton(
+                                onPressed: _isJoining ? null : _createRoom,
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 40, vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                  backgroundColor: _isJoining
+                                      ? Colors.grey
+                                      : Colors.orangeAccent,
+                                ),
+                                child: _isJoining
+                                    ? SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.black, strokeWidth: 3),
+                                )
+                                    : Text("Crear Sala", style: TextStyle(
+                                    fontSize: 18, color: Colors.black)),
+                              ),
+                              SizedBox(height: 10), // Espacio entre los botones
+
+                              // 🔥 Botón Volver
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pushReplacement(
+                                    PageRouteBuilder(
+                                      pageBuilder: (context, animation,
+                                          secondaryAnimation) => MainScreen(),
+                                      transitionDuration: Duration.zero,
+                                      reverseTransitionDuration: Duration.zero,
+                                    ),
+                                  );
+                                },
+                                child: Text("Volver", style: TextStyle(
+                                    color: Colors.redAccent, fontSize: 18)),
+                              ),
+                            ],
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

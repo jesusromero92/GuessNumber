@@ -7,6 +7,11 @@ class UserData {
   static String? profileImage;
   static Function()? onUserUpdated; // 🔥 Callback para notificar cambios a la UI
 
+  /// 🔥 Inicializar los datos cuando la app se carga
+  static Future<void> init() async {
+    await loadUserData();
+  }
+
   /// 🔥 Cargar datos del usuario desde SharedPreferences
   static Future<void> loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -34,6 +39,7 @@ class UserData {
   static Future<void> setUsername(String newUsername) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString("lastUsername", newUsername);
+    await prefs.setBool("isLogged", true); // 🔥 Ahora sí guarda isLoggedIn correctamente
     username = newUsername;
     isLoggedIn = true;
 
