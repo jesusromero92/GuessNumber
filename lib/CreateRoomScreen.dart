@@ -77,13 +77,12 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({
             "roomId": roomId,
-            "username": _username, // 🔥 Se usa el usuario cargado
+            "username": _username,
             "digits": digits,
           }),
         ),
         Future.delayed(Duration(seconds: 15), () =>
-        throw TimeoutException(
-            "⏳ Tiempo de espera agotado")),
+        throw TimeoutException("⏳ Tiempo de espera agotado")),
       ]);
 
       if (response is http.Response && response.statusCode == 200) {
@@ -92,9 +91,10 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
 
         print("✅ Sala creada con éxito. Configurada para $roomDigits dígitos.");
 
-        Navigator.pushNamed(
-          context,
-          '/game',
+        // 🔥 Asegurarnos de que no vuelva a CreateRoomScreen al salir de GameScreenGame
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/game', // 🚀 Ir a GameScreenGame
+              (route) => false, // 🔥 Borra todas las pantallas anteriores (incluyendo CreateRoomScreen)
           arguments: {
             'username': _username,
             'roomId': roomId,
@@ -103,15 +103,13 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(
-              "❌ No se pudo crear la sala. Intenta con otro ID.")),
+          SnackBar(content: Text("❌ No se pudo crear la sala. Intenta con otro ID.")),
         );
       }
     } catch (e) {
       print("❌ Error en la creación de la sala: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(
-            "❌ Ocurrió un error al crear la sala o la solicitud tardó demasiado.")),
+        SnackBar(content: Text("❌ Ocurrió un error al crear la sala o la solicitud tardó demasiado.")),
       );
     } finally {
       setState(() {
@@ -119,6 +117,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

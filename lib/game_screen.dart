@@ -6,6 +6,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
 
+import 'main.dart';
+
 class GameScreenGame extends StatefulWidget {
   @override
   _GameScreenState createState() => _GameScreenState();
@@ -377,26 +379,35 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
 
 // ✅ Método para manejar salida voluntaria
-  // ✅ Método para manejar salida voluntaria y volver correctamente a MainScreen
   Future<bool> _handleExit() async {
     hasExited = true; // 🔥 Marcar que este jugador salió voluntariamente
 
     try {
+      // 🔥 Si es el creador, elimina la sala antes de salir
       await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
 
+      // 🔥 Notificar a los demás jugadores que abandonaste
       _channel?.sink.add(jsonEncode({
         "type": "player_left",
         "username": username
       }));
 
+      // 🔥 Cerrar WebSocket y limpiar referencias
       _channel?.sink.close();
       _channel = null;
 
-      // 🔥 Verificar si la pantalla está montada antes de navegar
+      _emojiChannel?.sink.close();
+      _emojiChannel = null;
+
+      // 🔥 Limpiar la navegación y volver DIRECTAMENTE a `MainScreen`
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false, arguments: {
-          "snackbarMessage": "Has salido de la sala."
-        });
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/', // 🔥 Regresa solo a MainScreen
+              (route) => false,
+          arguments: {
+            "snackbarMessage": "Has salido de la sala."
+          },
+        );
       }
     } catch (e) {
       print("❌ Error al salir de la sala: $e");
@@ -404,6 +415,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
     return Future.value(true);
   }
+
 
 
 
@@ -434,73 +446,53 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       builder: (context) {
         return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20), // 🔥 Bordes redondeados
+            borderRadius: BorderRadius.circular(20),
           ),
-          backgroundColor: Colors.black, // 🔥 Fondo oscuro moderno
+          backgroundColor: Colors.black,
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 🔥 Ícono de advertencia grande
                 Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 60),
                 SizedBox(height: 10),
-
-                // 🔥 Título llamativo
                 Text(
                   "¿Seguro que quieres abandonar?",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 SizedBox(height: 10),
-
-                // 🔥 Mensaje informativo
                 Text(
                   "Si sales, la sala será eliminada y tu oponente será expulsado.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
                 SizedBox(height: 20),
 
-                // 🔥 Botones modernos con diseño personalizado
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // 🔥 Botón de cancelar
+                    // 🔥 Botón Cancelar
                     TextButton(
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        backgroundColor: Colors.grey[800], // 🔥 Color oscuro
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        backgroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () => Navigator.of(context).pop(false),
-                      child: Text(
-                        "Cancelar",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
-                      ),
+                      child: Text("Cancelar", style: TextStyle(fontSize: 16, color: Colors.white)),
                     ),
 
-                    // 🔥 Botón de confirmar salida
+                    // 🔥 Botón Confirmar Salida
                     TextButton(
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        backgroundColor: Colors.redAccent, // 🔥 Color llamativo
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        backgroundColor: Colors.redAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () async {
                         Navigator.of(context).pop(true);
-                        await _handleExit();
+                        await _handleExit(); // 🔥 Salida asegurada directamente a `MainScreen`
                       },
                       child: Text(
                         "Sí, salir",
@@ -518,6 +510,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
+
+
   @override
   Widget build(BuildContext context) {
     bool isMyTurn = turnUsername == username;
@@ -525,7 +519,17 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     return WillPopScope(
       onWillPop: () async {
         if (_exitRequested) {
-          return await _showExitConfirmationDialog();
+          bool confirmExit = await _showExitConfirmationDialog();
+          if (confirmExit) {
+            await _handleExit(); // 🔥 Cerrar correctamente la sala
+            if (mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/', // 🔥 Volver directamente a MainScreen
+                    (route) => false,
+              );
+            }
+          }
+          return false; // 🔥 Evita que la app se cierre directamente
         } else {
           _exitRequested = true; // 🔥 Marcar que el usuario presionó "Atrás" una vez
           ScaffoldMessenger.of(context).showSnackBar(
@@ -540,7 +544,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             _exitRequested = false;
           });
 
-          return Future.value(false); // 🔥 No salir todavía
+          return false; // 🔥 No salir todavía
         }
       },
       child: Scaffold(
@@ -571,7 +575,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                 AnimatedSwitcher(
                   duration: Duration(milliseconds: 300),
                   child: Text(
-                    isMyTurn ? "Tu turno" : "Turno del oponente",
+                    isMyTurn ? "Tu turno" : "Oponente",
                     key: ValueKey(isMyTurn),
                     style: TextStyle(
                       fontSize: 14,
@@ -596,26 +600,31 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
               children: [
                 // 🔥 Fila debajo del AppBar para mostrar el número secreto
                 Container(
-                  color: Colors.black,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white12, // 🔥 Color sutil (cambia si quieres)
+                        width: 1, // 🔥 Grosor del borde fino
+                      ),
+                    ),
+                  ),
                   padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         "Tu número secreto: ",
-                        style: TextStyle(fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       Text(
                         myNumber,
-                        style: TextStyle(fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
                       ),
                     ],
                   ),
                 ),
+
 
                 Expanded(
                   child: isWaiting
