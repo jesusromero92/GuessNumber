@@ -29,6 +29,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   List<String> floatingEmojis = [];
   bool _exitRequested = false; // 🔥 Rastrea si el usuario ya presionó "Volver" una vez
   int maxDigits = 4; // 🔥 Por defecto es 4, pero se actualizará según la sala
+  String opponentUsername = ""; // Guarda el nombre fijo del oponente
+
 
 
   @override
@@ -307,21 +309,51 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
   Future<void> _checkPlayersInRoom() async {
     while (isWaiting) {
-      final response = await http.get(
-          Uri.parse('http://109.123.248.19:4000/players-in-room/$roomId'));
+      try {
+        print("🔍 Chequeando jugadores en la sala...");
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['count'] >= 2) {
-          setState(() {
-            isWaiting = false;
-          });
-          return;
+        final response = await http.get(
+            Uri.parse('http://109.123.248.19:4000/players-in-room/$roomId'));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print("📊 Respuesta de la API: $data");
+
+          if (data['count'] >= 2 && data['players'] != null) {
+            print("👥 Hay 2 jugadores en la sala, obteniendo el oponente...");
+
+            // ✅ Buscar el oponente (que no sea el usuario actual)
+            String opponent = data['players'].firstWhere(
+                  (player) => player != username,
+              orElse: () => "Oponente desconocido",
+            );
+
+            print("🎮 Oponente encontrado: $opponent");
+
+            // 🔥 Esperar 2 segundos antes de actualizar `isWaiting`
+            //await Future.delayed(Duration(seconds: 2));
+
+            setState(() {
+              isWaiting = false;
+              opponentUsername = opponent; // Guarda el nombre del oponente
+            });
+
+            return; // Salimos del bucle
+          } else {
+            print("⌛ Aún no hay 2 jugadores en la sala.");
+          }
+        } else {
+          print("❌ Error al obtener jugadores: ${response.body}");
         }
+      } catch (e) {
+        print("❌ Error en la solicitud de jugadores: $e");
       }
+
       await Future.delayed(Duration(seconds: 2));
     }
   }
+
+
 
   void _sendGuess() {
     String guess = _controller.text;
@@ -514,16 +546,33 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          title: isWaiting
+              ? Text("Buscando oponente...") // Mientras espera un oponente
+              : Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Alinea los elementos
             children: [
-              Text("Sala: $roomId"),
+              Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.blueAccent,
+                    child: Text(
+                      opponentUsername.isNotEmpty ? opponentUsername[0].toUpperCase() : "?",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    opponentUsername, // ✅ Nombre FIJO del oponente
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
               if (isTurnDefined)
                 AnimatedSwitcher(
                   duration: Duration(milliseconds: 300),
                   child: Text(
                     isMyTurn ? "Tu turno" : "Turno del oponente",
-                    key: ValueKey(turnUsername),
+                    key: ValueKey(isMyTurn),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -540,6 +589,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             },
           ),
         ),
+
         body: Stack(
           children: [
             Column(
