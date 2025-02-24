@@ -17,8 +17,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 🔥 Ocultar SOLO la barra de estado (mantiene la barra de navegación)
-  _hideStatusBar(); // Ocultar la barra de estado al iniciar
-
+  //_hideStatusBar(); // Ocultar la barra de estado al iniciar
   runApp(MyApp());
 }
 void _hideStatusBar() {
@@ -29,6 +28,7 @@ void _hideStatusBar() {
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp, // 🔥 Solo modo vertical
   ]);
+
 }
 
 class MyApp extends StatelessWidget {
@@ -89,15 +89,8 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _loadLastSession(); // 🔥 Cargar última sesión guardada
     _loadUsername(); // Cargar el nombre al iniciar
-    _startHideTimer();
   }
 
-  void _startHideTimer() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(Duration(seconds: 3), () {
-      _hideStatusBar(); // 🔥 Vuelve a ocultar la barra de estado
-    });
-  }
 
   // 🔥 Cargar los datos guardados en SharedPreferences
   Future<void> _loadLastSession() async {
@@ -486,93 +479,113 @@ class _MainScreenState extends State<MainScreen> {
         final double buttonHeight = isHorizontal && isSmallScreen ? 40 : 60;
         final double buttonFontSize = isHorizontal && isSmallScreen ? 12 : 18;
 
-        return GestureDetector(
-          onTap: _startHideTimer, // 🔥 Reiniciar temporizador al tocar
-          onPanUpdate: (details) => _startHideTimer(), // 🔥 Reiniciar al deslizar
-          child: Scaffold(
-            body: Stack(
-              children: [
-                // 🔥 Fondo de pantalla
-                Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: AssetImage("assets/background.png"),
-                      fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(
-                          Colors.black.withOpacity(0.6), BlendMode.darken),
-                    ),
+        return Scaffold(
+          appBar: PreferredSize(
+            preferredSize: Size.fromHeight(60), // 🔥 Tamaño fijo del AppBar
+            child: SafeArea(child: TopBar()), // 🔥 Evita que la barra de estado lo afecte
+          ),
+          body: Stack(
+            children: [
+              // 🔥 Fondo de pantalla
+              Container(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage("assets/background.png"),
+                    fit: BoxFit.cover,
+                    colorFilter: ColorFilter.mode(
+                        Colors.black.withOpacity(0.6), BlendMode.darken),
                   ),
                 ),
+              ),
 
-                // 🔥 TopBar pegado arriba del todo sin `Positioned` dentro del widget
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: TopBar(),
+              // 🔥 Contenido en una Column alineada arriba
+              isHorizontal
+                  ? SingleChildScrollView(
+                physics: BouncingScrollPhysics(),
+                child: _buildContent(
+                  iconSize, titleFontSize, buttonHeight, buttonFontSize,
                 ),
-
-                // 🔥 Contenido completamente centrado
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.videogame_asset_rounded,
-                          color: Colors.white, size: iconSize), // 🔥 Ícono ajustado
-                      SizedBox(height: 20),
-                      Text(
-                        "¡Adivina el Número!",
-                        style: TextStyle(
-                          fontSize: titleFontSize, // 🔥 Texto ajustado
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(height: 30),
-
-                      // 🔥 BOTÓN ESTILO EXACTO DE LA IMAGEN (Ajustado para pantallas pequeñas)
-                      _buildStyledButton(
-                        title: "Crear Sala",
-                        subtitle: "Multijugador",
-                        baseColor: Colors.purpleAccent,
-                        darkColor: Colors.deepPurple,
-                        icon: Icons.meeting_room,
-                        buttonHeight: buttonHeight, // 🔥 Ajuste dinámico del botón
-                        fontSize: buttonFontSize, // 🔥 Ajuste dinámico del texto
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            PageRouteBuilder(
-                              pageBuilder: (context, animation, secondaryAnimation) =>
-                                  CreateRoomScreen(username: _username),
-                              transitionDuration: Duration.zero, // 🔥 Sin animación
-                              reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
-                            ),
-                          );
-                        },
-                      ),
-
-                      SizedBox(height: 10),
-
-                      _buildStyledButton(
-                        title: "Listar Salas",
-                        subtitle: "Partidas activas",
-                        baseColor: Colors.orangeAccent,
-                        darkColor: Colors.deepOrange,
-                        icon: Icons.list,
-                        buttonHeight: buttonHeight, // 🔥 Ajuste dinámico del botón
-                        fontSize: buttonFontSize, // 🔥 Ajuste dinámico del texto
-                        onPressed: () => _showAvailableRooms(context),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              )
+                  : _buildContent(iconSize, titleFontSize, buttonHeight, buttonFontSize),
+            ],
           ),
         );
       },
     );
   }
+
+  /// 🔥 Contenido ajustado (Centrado horizontalmente pero más arriba, SIN fondo en el icono)
+  Widget _buildContent(double iconSize, double titleFontSize, double buttonHeight, double buttonFontSize) {
+    return Align(
+      alignment: Alignment.topCenter, // 🔥 Centrado horizontalmente, pero más arriba
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20), // 🔥 Márgenes laterales
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // 🔥 Se ajusta al contenido, sin ocupar toda la pantalla
+          crossAxisAlignment: CrossAxisAlignment.center, // 🔥 Asegura que todo esté centrado
+          children: [
+            SizedBox(height: 120), // 🔥 Ajuste para subir todo más arriba
+
+            // 🔥 Icono sin fondo, directamente en color blanco
+            Icon(Icons.videogame_asset_rounded, color: Colors.white, size: iconSize),
+
+            SizedBox(height: 10), // 🔥 Espacio reducido para que esté más arriba
+
+            // 🔥 Título
+            Text(
+              "¡Adivina el Número!",
+              textAlign: TextAlign.center, // 🔥 Asegura que el texto esté centrado
+              style: TextStyle(
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+
+            SizedBox(height: 20), // 🔥 Mantiene espacio para los botones
+
+            // 🔥 Botón Crear Sala
+            _buildStyledButton(
+              title: "Crear Sala",
+              subtitle: "Multijugador",
+              baseColor: Colors.purpleAccent,
+              darkColor: Colors.deepPurple,
+              icon: Icons.meeting_room,
+              buttonHeight: buttonHeight,
+              fontSize: buttonFontSize,
+              onPressed: () {
+                Navigator.of(context).push(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        CreateRoomScreen(username: _username),
+                    transitionDuration: Duration.zero,
+                    reverseTransitionDuration: Duration.zero,
+                  ),
+                );
+              },
+            ),
+
+            SizedBox(height: 10), // 🔥 Espaciado entre botones
+
+            // 🔥 Botón Listar Salas
+            _buildStyledButton(
+              title: "Listar Salas",
+              subtitle: "Partidas activas",
+              baseColor: Colors.orangeAccent,
+              darkColor: Colors.deepOrange,
+              icon: Icons.list,
+              buttonHeight: buttonHeight,
+              fontSize: buttonFontSize,
+              onPressed: () => _showAvailableRooms(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
 
   /// 🔥 Widget de botón con tamaño dinámico según la pantalla
   Widget _buildStyledButton({
