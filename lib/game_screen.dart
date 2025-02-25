@@ -32,6 +32,10 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   bool _exitRequested = false; // 🔥 Rastrea si el usuario ya presionó "Volver" una vez
   int maxDigits = 4; // 🔥 Por defecto es 4, pero se actualizará según la sala
   String opponentUsername = ""; // Guarda el nombre fijo del oponente
+// 🔥 VARIABLES NUEVAS (deben estar en la clase `_GameScreenState`)
+  bool _advantagesBlocked = false; // Indica si las ventajas del jugador están bloqueadas
+  int _blockedTurnsRemaining = 0; // Cantidad de turnos bloqueados
+  bool _opponentAdvantagesBlocked = false; // Indica si el oponente está bloqueado
 
 
 
@@ -114,10 +118,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final args = ModalRoute
-        .of(context)!
-        .settings
-        .arguments as Map;
+    final args = ModalRoute.of(context)!.settings.arguments as Map;
     username = args['username'];
     roomId = args['roomId'];
 
@@ -147,16 +148,15 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      WinnerScreen(
-                        winnerUsername: data["winner"] ?? "Jugador Desconocido",
-                        guessedNumber: data["guessedNumber"] ??
-                            "Numero Desconocido",
-                      ),
+                  builder: (context) => WinnerScreen(
+                    winnerUsername: data["winner"] ?? "Jugador Desconocido",
+                    guessedNumber: data["guessedNumber"] ?? "Numero Desconocido",
+                  ),
                 ),
               );
             }
           }
+
           if (data["type"] == "player_left" && !hasExited) {
             if (mounted) {
               Navigator.pushReplacementNamed(
@@ -171,8 +171,21 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             setState(() {
               turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
               isTurnDefined = true;
+
+              // 🔥 Reducir contador de turnos bloqueados si aún está activo
+              if (_advantagesBlocked && _blockedTurnsRemaining > 0) {
+                _blockedTurnsRemaining--;
+
+                // 🔥 Si el contador llega a 0, desbloquear ventajas
+                if (_blockedTurnsRemaining == 0) {
+                  _advantagesBlocked = false;
+                }
+              }
             });
           }
+
+          _listenForAdvantageBlock(message); // 🔥 Escuchar si el oponente bloqueó ventajas
+
         } catch (e) {
           print("❌ Error al decodificar mensaje: $e");
         }
@@ -183,6 +196,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       _registerUser();
     }
   }
+
 
   /// 🔥 Muestra el modal inferior con más emojis variados
   void _showEmojiPicker() {
@@ -522,79 +536,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     ) ?? false;
   }
 
-  void _showAdvantagesBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)), // 🔥 Esquinas redondeadas
-      ),
-      backgroundColor: Colors.black87, // 🔥 Fondo oscuro
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // 🔥 Solo ocupar el espacio necesario
-            children: [
-              Text(
-                "Ventajas Disponibles",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              SizedBox(height: 10),
-
-              // 🔥 Lista de ventajas con la lógica añadida
-              _advantageOption(
-                context,
-                Icons.visibility,
-                "Revelar un número",
-                "Muestra un número correcto aleatorio",
-                _revealOpponentNumber, // 🔥 Llamamos a la función de revelar número
-              ),
-              _advantageOption(
-                context,
-                Icons.lightbulb_outline,
-                "Pista extra",
-                "Te da una pista sobre la posición correcta",
-                _getHintCorrectPosition, // Llama a la función cuando se seleccione
-              ),
-              _advantageOption(
-                context,
-                Icons.undo,
-                "Repetir intento",
-                "Te permite volver a intentar sin penalización",
-                _useRepeatTurn, // ✅ Nueva función
-              ),
-              _advantageOption(
-                context,
-                Icons.block,
-                "Bloquear pista",
-                "Impide que tu oponente reciba una pista",
-                    () => print("Bloquear pista seleccionada"), // TODO: Implementar lógica
-              ),
-
-              SizedBox(height: 15),
-              TextButton(
-                onPressed: () => Navigator.pop(context), // 🔥 Cerrar BottomSheet
-                child: Text("Cerrar", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// 🔥 Widget para representar cada opción del BottomSheet con su acción específica
-  Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.amberAccent), // Icono a la izquierda
-      title: Text(title, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-      subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
-      onTap: () {
-        Navigator.pop(context); // 🔥 Cerrar el BottomSheet antes de ejecutar la ventaja
-        onTap();
-      },
-    );
-  }
 
   void _revealOpponentNumber() async {
     try {
@@ -826,6 +767,169 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
+  /// 🔥 FUNCIÓN PARA BLOQUEAR LAS VENTAJAS DEL OPONENTE
+  void _blockOpponentAdvantages() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://109.123.248.19:4000/block-advantages'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "roomId": roomId,
+          "username": username,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data["success"] == true) {
+          setState(() {
+            _opponentAdvantagesBlocked = true; // ✅ Bloquear ventajas del oponente
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("🚫 ¡Has bloqueado las ventajas de tu oponente por 2 turnos!")),
+          );
+
+          // 🔥 Enviar notificación por WebSocket
+          _channel?.sink.add(jsonEncode({
+            "type": "advantages_blocked",
+            "blockedBy": username,
+            "roomId": roomId,
+          }));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("⚠️ No puedes bloquear ventajas ahora.")),
+          );
+        }
+      } else {
+        throw Exception("Error al bloquear ventajas.");
+      }
+    } catch (e) {
+      print("❌ Error al bloquear ventajas: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ No se pudo bloquear las ventajas.")),
+      );
+    }
+  }
+
+  /// 🔥 BOTTOM SHEET DE VENTAJAS MODIFICADO
+  void _showAdvantagesBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: Colors.black87,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Ventajas Disponibles",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              SizedBox(height: 10),
+
+              if (_advantagesBlocked)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    "🚫 Tus ventajas están bloqueadas por $_blockedTurnsRemaining turnos.",
+                    style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  ),
+                ),
+
+              _advantageOption(
+                context,
+                Icons.block,
+                "Bloquear ventajas del oponente",
+                "Evita que el oponente use ventajas por 2 turnos",
+                _advantagesBlocked ? () {} : _blockOpponentAdvantages, // 🔥 Deshabilita si está bloqueado
+              ),
+
+              _advantageOption(
+                context,
+                Icons.visibility,
+                "Revelar un número",
+                "Muestra un número correcto aleatorio",
+                _advantagesBlocked ? () {} : _revealOpponentNumber,
+              ),
+
+              _advantageOption(
+                context,
+                Icons.lightbulb_outline,
+                "Pista extra",
+                "Te da una pista sobre la posición correcta",
+                _advantagesBlocked ? () {} : _getHintCorrectPosition,
+              ),
+
+              _advantageOption(
+                context,
+                Icons.undo,
+                "Repetir intento",
+                "Te permite volver a intentar sin penalización",
+                _advantagesBlocked ? () {} : _useRepeatTurn,
+              ),
+
+              SizedBox(height: 15),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("Cerrar", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 🔥 **FUNCIÓN PARA CREAR UNA OPCIÓN DEL BOTTOM SHEET**
+  Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.amberAccent),
+      title: Text(title, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+      subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
+      onTap: onTap, // 🔥 Si las ventajas están bloqueadas, la función será vacía `() {}`
+    );
+  }
+
+  /// 🔥 ESCUCHAR SI EL OPONENTE BLOQUEA TUS VENTAJAS
+  void _listenForAdvantageBlock(String message) {
+    try {
+      final data = jsonDecode(message);
+
+      if (data["type"] == "advantages_blocked" && data["blockedBy"] != username) {
+        setState(() {
+          _advantagesBlocked = true;
+          _blockedTurnsRemaining = 2; // 🔥 Bloqueo inicial de 2 turnos
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("🚫 ¡Tu oponente ha bloqueado tus ventajas por 2 turnos!")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error al procesar bloqueo de ventajas: $e");
+    }
+  }
+
+  /// 🔥 REDUCIR EL BLOQUEO EN CADA TURNO
+  void _reduceAdvantageBlock() {
+    if (_advantagesBlocked && _blockedTurnsRemaining > 0) {
+      setState(() {
+        _blockedTurnsRemaining--;
+
+        if (_blockedTurnsRemaining == 0) {
+          _advantagesBlocked = false; // 🔥 Desbloquea cuando llega a 0 turnos
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("✅ ¡Tus ventajas han sido desbloqueadas!")),
+          );
+        }
+      });
+    }
+  }
 
 
 
@@ -934,13 +1038,31 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                     children: [
                       // 🔥 Icono de ventajas interactivo
                       GestureDetector(
-                        onTap: () => _showAdvantagesBottomSheet(context), // 🔥 Mostrar BottomSheet al tocar
-                        child: Icon(
-                          Icons.star, // Ícono de ventajas
-                          color: Colors.amberAccent, // Color amarillo brillante
-                          size: 24, // Tamaño del icono
+                        onTap: _advantagesBlocked
+                            ? null // 🔥 Si está bloqueado, no permite tocar
+                            : () => _showAdvantagesBottomSheet(context), // 🔥 Mostrar BottomSheet solo si no está bloqueado
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Icon(
+                              Icons.star,
+                              color: _advantagesBlocked ? Colors.grey : Colors.amberAccent, // 🔥 Color cambia según estado
+                              size: 24,
+                            ),
+                            if (_advantagesBlocked) // 🔥 Agregar un pequeño "bloqueo" visual encima
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Icon(
+                                  Icons.block, // Ícono de bloqueo
+                                  color: Colors.redAccent, // 🔥 Rojo para indicar que está bloqueado
+                                  size: 12, // Tamaño más pequeño
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+
                       SizedBox(width: 10), // Espaciado entre icono y texto
 
                       // 🔥 Textos dentro de un Expanded para que se ajusten bien
