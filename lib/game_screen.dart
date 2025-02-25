@@ -47,6 +47,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     "advantage_block_opponent": 0,
   };
   bool _showBlockAnimation = false; // 🔥 Controla la visibilidad de la animación
+  bool _isMounted = true; // 🔥 Nueva variable para saber si el widget sigue en pantalla.
 
 
 
@@ -56,6 +57,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     _channel?.sink.close();
     _emojiChannel?.sink.close();
     WidgetsBinding.instance.removeObserver(this); // 🔥 Remover el observer
+    _isMounted = false; // 🔥 Marcar que el widget ya no está activo.
     super.dispose();
   }
 
@@ -65,7 +67,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     WidgetsBinding.instance.addObserver(this); // 🔥 Suscribir el observer
     // ✅ Conectar WebSocket de emojis una sola vez
     _emojiChannel = IOWebSocketChannel.connect('ws://109.123.248.19:4001/ws/emojis');
-
+    _isMounted = true; // 🔥 Marcar que el widget está activo.
     // ✅ Escuchar los emojis del oponente
     _emojiChannel!.stream.listen((message) {
       try {
@@ -350,7 +352,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
   Future<void> _checkPlayersInRoom() async {
-    while (isWaiting) {
+    while (isWaiting && _isMounted) { // 🔥 Solo ejecuta si el widget sigue activo
       try {
         print("🔍 Chequeando jugadores en la sala...");
 
@@ -364,7 +366,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
           if (data['count'] >= 2 && data['players'] != null) {
             print("👥 Hay 2 jugadores en la sala, obteniendo el oponente...");
 
-            // ✅ Buscar el oponente (que no sea el usuario actual)
             String opponent = data['players'].firstWhere(
                   (player) => player != username,
               orElse: () => "Oponente desconocido",
@@ -372,17 +373,14 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
             print("🎮 Oponente encontrado: $opponent");
 
-            // 🔥 Esperar 2 segundos antes de actualizar `isWaiting`
-            //await Future.delayed(Duration(seconds: 2));
-
-            if (mounted) {
+            if (_isMounted) { // 🔥 Solo actualiza si el widget sigue montado
               setState(() {
                 isWaiting = false;
                 opponentUsername = opponent;
               });
             }
 
-            return; // Salimos del bucle
+            return; // 🔥 Salir del loop cuando ya hay dos jugadores.
           } else {
             print("⌛ Aún no hay 2 jugadores en la sala.");
           }
@@ -396,7 +394,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       await Future.delayed(Duration(seconds: 2));
     }
   }
-
 
 
   void _sendGuess() {
@@ -1069,9 +1066,9 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("✅ ${data['message']}")),
-        );
+        //ScaffoldMessenger.of(context).showSnackBar(
+          //SnackBar(content: Text("✅ ${data['message']}")),
+        //);
 
         await _fetchAdvantagesLeft(); // 🔥 Actualiza las ventajas disponibles
       } else {
