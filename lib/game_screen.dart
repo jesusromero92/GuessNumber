@@ -557,7 +557,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                 Icons.undo,
                 "Repetir intento",
                 "Te permite volver a intentar sin penalización",
-                    () => print("Repetir intento seleccionado"), // TODO: Implementar lógica
+                _useRepeatTurn, // ✅ Nueva función
               ),
               _advantageOption(
                 context,
@@ -788,6 +788,38 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
+  void _useRepeatTurn() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://109.123.248.19:4000/repeat-turn'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "roomId": roomId,
+          "username": username,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data["success"] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("🔄 ¡Puedes hacer otro intento sin cambiar el turno!")),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("⚠️ No puedes repetir turno ahora.")),
+          );
+        }
+      } else {
+        throw Exception("Error al solicitar repetir turno.");
+      }
+    } catch (e) {
+      print("❌ Error en repetir turno: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ No se pudo procesar la ventaja.")),
+      );
+    }
+  }
 
 
 
