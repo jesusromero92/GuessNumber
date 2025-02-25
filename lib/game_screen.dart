@@ -169,13 +169,22 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
           if (data["type"] == "player_left" && !hasExited) {
             if (mounted) {
-              Navigator.pushReplacementNamed(
-                context,
-                '/',
-                arguments: {"snackbarMessage": "El oponente ha abandonado la sala."},
+              Navigator.of(context).pushAndRemoveUntil(
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
+                  transitionDuration: Duration.zero,
+                  reverseTransitionDuration: Duration.zero,
+                ),
+                    (route) => false, // 🔥 Elimina todas las pantallas previas
+              );
+
+              // 🔥 Mostrar mensaje de que el oponente abandonó
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("⚠️ El oponente ha abandonado la sala.")),
               );
             }
           }
+
 
           else if (data["type"] == "turn") {
             setState(() {
@@ -409,7 +418,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
-// ✅ Método para manejar salida voluntaria
   Future<bool> _handleExit() async {
     if (hasExited) return false; // 🔥 Evita ejecutar la salida más de una vez
     hasExited = true; // 🔥 Marcar que el usuario ha salido
@@ -438,10 +446,14 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
           SnackBar(content: Text("Has salido de la sala.")),
         );
 
-        // 🔥 Limpiar la navegación y volver a la pantalla principal
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/',
-              (route) => false,
+        // 🔥 Volver a la pantalla principal sin animación
+        Navigator.of(context).pushAndRemoveUntil(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+          ),
+              (route) => false, // 🔥 Elimina todas las pantallas anteriores
         );
       }
     } catch (e) {
@@ -450,6 +462,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
     return Future.value(true);
   }
+
+
 
 
 
@@ -1136,9 +1150,14 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
           if (confirmExit) {
             await _handleExit(); // 🔥 Cerrar correctamente la sala
             if (mounted) {
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/', // 🔥 Volver directamente a MainScreen
-                    (route) => false,
+              // 🔥 Volver a la pantalla principal sin animación
+              Navigator.of(context).pushAndRemoveUntil(
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
+                  transitionDuration: Duration.zero,
+                  reverseTransitionDuration: Duration.zero,
+                ),
+                    (route) => false, // 🔥 Elimina todas las pantallas anteriores
               );
             }
           }
@@ -1160,6 +1179,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
           return false; // 🔥 No salir todavía
         }
       },
+
+
       child: Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
