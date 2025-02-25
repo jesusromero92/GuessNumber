@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:guess_number/user_data.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
@@ -88,12 +89,13 @@ class _MainScreenState extends State<MainScreen> {
   bool _isJoining = false; // 🔥 Nuevo estado para deshabilitar el botón
   String _username = "Guest_XXXXXXX"; // Valor por defecto
   Timer? _hideTimer;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadLastSession(); // 🔥 Cargar última sesión guardada
-    _loadUsername(); // Cargar el nombre al iniciar
+    _loadInitialData(); // 🔥 Cargar datos antes de mostrar la pantalla
   }
 
 
@@ -260,6 +262,46 @@ class _MainScreenState extends State<MainScreen> {
       _username = savedUsername!;
     });
   }
+
+  Future<void> _updateCoins() async {
+    try {
+      // 🔥 Primero, asegurarse de cargar el valor desde SharedPreferences
+      await UserData.loadUserData();
+      setState(() {}); // 🔄 Forzar actualización UI con valores locales
+
+      final response = await http.get(
+        Uri.parse('http://109.123.248.19:4000/get-coins/${UserData.username}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        int newCoins = data["coins"] ?? 0;
+
+        await UserData.setCoins(newCoins); // 🔥 Guardar en SharedPreferences
+        if (mounted) {
+          setState(() {}); // 🔥 Actualizar la UI con el nuevo valor
+        }
+
+        print("✅ Monedas actualizadas correctamente: $newCoins");
+      } else {
+        print("❌ Error al obtener las monedas: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ Error en _updateCoins: $e");
+    }
+  }
+
+  Future<void> _loadInitialData() async {
+    await UserData.loadUserData(); // 🔥 Asegurar que los datos estén listos
+    await _updateCoins(); // 🔥 Obtener las monedas desde el servidor
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false; // ✅ Datos listos, mostrar UI
+      });
+    }
+  }
+
 
   /// 🔥 Generar un Guest solo si no existe ya un usuario guardado
   Future<String> _generateGuestUsername() async {

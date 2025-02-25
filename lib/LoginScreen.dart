@@ -65,8 +65,18 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text("✅ ${data["message"]}")),
         );
 
-        await UserData.setUsername(username); // 🔥 Guardar usuario logueado
-        Navigator.pop(context, true); // 🔥 Devuelve `true` para recargar `TopBar`
+        await UserData.setUsername(username);
+        await UserData.setCoins(data["coins"] ?? 0); // 🔥 Guardar monedas obtenidas al loguearse
+
+        // 🔥 Verificar si las monedas se actualizaron
+        print("✅ Monedas actualizadas: ${UserData.coins}");
+
+        UserData.onUserUpdated?.call(); // 🔥 Notificar a la UI
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => MainScreen()),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("❌ ${data["error"]}")),
@@ -83,6 +93,8 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     }
   }
+
+
 
 
   @override

@@ -15,19 +15,26 @@ class _TopBarState extends State<TopBar> {
   void initState() {
     super.initState();
     _loadUser(); // 🔥 Cargar el usuario al iniciar
+
+    // 🔥 Escuchar cambios en los datos del usuario (ej. monedas)
+    UserData.onUserUpdated = () {
+      if (mounted) {
+        setState(() {});
+      }
+    };
   }
 
   Future<void> _loadUser() async {
-    await UserData.loadUserData(); // 🔥 Carga el usuario actual o aleatorio
+    await UserData.loadUserData(); // 🔥 Carga el usuario actual
     if (mounted) {
-      setState(() {}); // 🔥 Actualiza la UI cuando el usuario esté disponible
+      setState(() {}); // 🔥 Refresca la UI
     }
   }
 
   Future<void> _logout() async {
-    await UserData.logout(); // 🔥 Limpia datos del usuario y asigna guest_XXXX
+    await UserData.logout(); // 🔥 Cierra sesión y vuelve a Guest
     if (mounted) {
-      setState(() {}); // 🔥 Actualiza la UI después del logout
+      setState(() {}); // 🔥 Refresca la UI
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("🚪 Has cerrado sesión. Ahora eres ${UserData.username}.")),
@@ -43,7 +50,7 @@ class _TopBarState extends State<TopBar> {
         systemNavigationBarContrastEnforced: false,
       ),
       child: Container(
-        height: 60, // 🔥 Fija la altura para evitar cambios inesperados
+        height: 60, // 🔥 Fija la altura
         padding: EdgeInsets.symmetric(horizontal: 8),
         color: Colors.black.withOpacity(0.6),
         child: IntrinsicHeight(
@@ -65,7 +72,8 @@ class _TopBarState extends State<TopBar> {
                   UserData.isLoggedIn && UserData.profileImage != null
                       ? CircleAvatar(radius: 20, backgroundImage: AssetImage(UserData.profileImage!))
                       : CircleAvatar(
-                    radius: 20, backgroundColor: Colors.white,
+                    radius: 20,
+                    backgroundColor: Colors.white,
                     child: Icon(Icons.person, color: Colors.black, size: 24),
                   ),
                   SizedBox(height: 0),
@@ -74,7 +82,7 @@ class _TopBarState extends State<TopBar> {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      UserData.username.isNotEmpty ? UserData.username : "Cargando...",
+                      UserData.username.isNotEmpty ? UserData.username : "",
                       style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -86,12 +94,15 @@ class _TopBarState extends State<TopBar> {
               // 🔹 Monedas y Botón de Login/Logout (Derecha)
               Row(
                 children: [
-                  Icon(Icons.attach_money, color: Colors.white, size: 20),
-                  Text(
-                    "15",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  SizedBox(width: 15),
+                  if (UserData.username.isNotEmpty && UserData.coins > 0) ...[
+                    Icon(Icons.stars, color: Colors.amberAccent, size: 20), // 🔥 Ícono cambiado
+                    SizedBox(width: 4),
+                    Text(
+                      "${UserData.coins}",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    SizedBox(width: 15),
+                  ],
 
                   // 🔹 Botón de Login / Logout
                   IconButton(
@@ -101,7 +112,7 @@ class _TopBarState extends State<TopBar> {
                     ),
                     onPressed: () {
                       if (UserData.isLoggedIn) {
-                        _logout(); // 🔥 Cierra sesión y asigna guest_XXXX
+                        _logout(); // 🔥 Cierra sesión y vuelve a Guest
                       } else {
                         Navigator.of(context).pushNamed('/login').then((_) {
                           _loadUser(); // 🔥 Recargar datos cuando el usuario inicie sesión
