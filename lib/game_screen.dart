@@ -36,6 +36,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   bool _advantagesBlocked = false; // Indica si las ventajas del jugador están bloqueadas
   int _blockedTurnsRemaining = 0; // Cantidad de turnos bloqueados
   bool _opponentAdvantagesBlocked = false; // Indica si el oponente está bloqueado
+  int _remainingAdvantages = 2; // 🔥 Cada jugador empieza con 2 intentos de ventajas
+
 
 
 
@@ -554,6 +556,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             duration: Duration(seconds: 4),
           ),
         );
+        await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
       } else {
         throw Exception("Error al obtener el número del oponente.");
       }
@@ -671,7 +674,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         final data = jsonDecode(response.body);
         String message;
         Color bgColor;
-
+        await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
         if (data["found"] == true) {
           message = "📍 El número ${data["digit"]} está en la posición ${data["position"] + 1}.";
           bgColor = Colors.green.withOpacity(0.8); // ✅ Verde claro transparente
@@ -747,6 +750,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data["success"] == true) {
+          await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("🔄 ¡Puedes hacer otro intento sin cambiar el turno!")),
           );
@@ -782,6 +786,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data["success"] == true) {
+          await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
           setState(() {
             _opponentAdvantagesBlocked = true; // ✅ Bloquear ventajas del oponente
           });
@@ -813,7 +818,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     }
   }
 
-  void _showAdvantagesBottomSheet(BuildContext context) {
+  Future<void> _showAdvantagesBottomSheet(BuildContext context) async {
+    await _fetchAdvantagesLeft(); // 🔥 Obtener ventajas restantes antes de mostrar el Bottom Sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, // 🔥 Control total del tamaño
@@ -830,7 +836,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             children: [
               // 🔥 Título
               Text(
-                "Ventajas Disponibles",
+                "Ventajas Disponibles ($_remainingAdvantages)", // 🔥 Mostrar intentos restantes
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               SizedBox(height: 10),
@@ -936,6 +942,29 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       ),
     );
   }
+
+  Future<void> _fetchAdvantagesLeft() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://109.123.248.19:4000/advantages-left/$roomId/$username'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _remainingAdvantages = 2 - (data["advantages_used"] as int? ?? 0);
+
+          });
+        }
+      } else {
+        print("❌ Error al obtener ventajas restantes: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ Error en la solicitud de ventajas restantes: $e");
+    }
+  }
+
 
 
   /// 🔥 ESCUCHAR SI EL OPONENTE BLOQUEA TUS VENTAJAS
@@ -1081,7 +1110,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                     children: [
                       // 🔥 Icono de ventajas interactivo
                       GestureDetector(
-                        onTap: _advantagesBlocked
+                        onTap: _advantagesBlocked || _remainingAdvantages == 0
                             ? null // 🔥 Si está bloqueado, no permite tocar
                             : () => _showAdvantagesBottomSheet(context), // 🔥 Mostrar BottomSheet solo si no está bloqueado
                         child: Stack(
@@ -1089,7 +1118,9 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                           children: [
                             Icon(
                               Icons.star,
-                              color: _advantagesBlocked ? Colors.grey : Colors.amberAccent, // 🔥 Color cambia según estado
+                              color: (_advantagesBlocked || _remainingAdvantages == 0)
+                                  ? Colors.grey  // 🔥 Si está bloqueado o no quedan ventajas → Gris
+                                  : Colors.amberAccent, // 🔥 Si hay ventajas disponibles → Amarillo
                               size: 24,
                             ),
                             if (_advantagesBlocked) // 🔥 Agregar un pequeño "bloqueo" visual encima
