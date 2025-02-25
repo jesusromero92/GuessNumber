@@ -197,13 +197,17 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             setState(() {
               turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
               isTurnDefined = true;
-              // 🔥 Reducir contador de turnos bloqueados si aún está activo
-              if (_advantagesBlocked && _blockedTurnsRemaining > 0 && data["blockedBy"] != username) {
+
+              // 🔥 Solo reducir el bloqueo cuando el oponente juega
+              if (_advantagesBlocked && _blockedTurnsRemaining > 0 && turnUsername != username) {
                 _blockedTurnsRemaining--;
 
                 // 🔥 Si el contador llega a 0, desbloquear ventajas
                 if (_blockedTurnsRemaining == 0) {
                   _advantagesBlocked = false;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("✅ ¡Tus ventajas han sido desbloqueadas!")),
+                  );
                 }
               }
             });
@@ -1136,8 +1140,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       if (data["type"] == "advantages_blocked" && data["blockedBy"] != username) {
         setState(() {
           _advantagesBlocked = true;
-          _blockedTurnsRemaining = 2; // 🔥 Bloqueo inicial de 2 turnos
-          _showBlockAnimation = true; // 🔥 Activar la animación
+          _blockedTurnsRemaining = 2; // 🔥 Se bloqueará hasta que el oponente juegue 2 veces
+          _showBlockAnimation = true;
         });
 
         // 🔥 Ocultar la animación después de 3 segundos
@@ -1148,10 +1152,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             });
           }
         });
-
-        //ScaffoldMessenger.of(context).showSnackBar(
-          //SnackBar(content: Text("🚫 ¡Tu oponente ha bloqueado tus ventajas por 2 turnos!")),
-        //);
       }
     } catch (e) {
       print("❌ Error al procesar bloqueo de ventajas: $e");
