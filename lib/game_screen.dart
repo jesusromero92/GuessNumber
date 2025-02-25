@@ -387,10 +387,11 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
 // ✅ Método para manejar salida voluntaria
   Future<bool> _handleExit() async {
-    hasExited = true; // 🔥 Marcar que este jugador salió voluntariamente
+    if (hasExited) return false; // 🔥 Evita ejecutar la salida más de una vez
+    hasExited = true; // 🔥 Marcar que el usuario ha salido
 
     try {
-      // 🔥 Si es el creador, elimina la sala antes de salir
+      // 🔥 Si es el creador, intenta eliminar la sala antes de salir
       await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
 
       // 🔥 Notificar a los demás jugadores que abandonaste
@@ -406,14 +407,17 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       _emojiChannel?.sink.close();
       _emojiChannel = null;
 
-      // 🔥 Limpiar la navegación y volver DIRECTAMENTE a `MainScreen`
       if (mounted) {
+        // 🔥 Verificar si ya se está mostrando un snackbar para evitar spam
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Has salido de la sala.")),
+        );
+
+        // 🔥 Limpiar la navegación y volver a la pantalla principal
         Navigator.of(context).pushNamedAndRemoveUntil(
-          '/', // 🔥 Regresa solo a MainScreen
+          '/',
               (route) => false,
-          arguments: {
-            "snackbarMessage": "Has salido de la sala."
-          },
         );
       }
     } catch (e) {
