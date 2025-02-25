@@ -816,22 +816,26 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   void _showAdvantagesBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // 🔥 Control total del tamaño
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      backgroundColor: Colors.black87,
+      backgroundColor: Color(0xFF1E1E1E), // 🔥 Un color gris oscuro en vez de negro puro
       builder: (context) {
         return Container(
+          height: 500, // 🔥 Altura fija para que no crezca ni se expanda
           padding: EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 🔥 Título
               Text(
                 "Ventajas Disponibles",
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               SizedBox(height: 10),
 
+              // 🔥 Aviso de bloqueo de ventajas
               if (_advantagesBlocked)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -841,66 +845,74 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                   ),
                 ),
 
-              // 🔥 1️⃣ PISTA EXTRA
-              _advantageOption(
-                context,
-                Icons.lightbulb_outline,
-                "Pista extra",
-                "Te da una pista sobre la posición correcta",
-                _advantagesBlocked
-                    ? () {}
-                    : () {
-                  Navigator.pop(context);
-                  _getHintCorrectPosition();
-                },
+              Expanded(
+                child: ListView(
+                  children: [
+                    // 🔥 1️⃣ PISTA EXTRA
+                    _advantageOption(
+                      context,
+                      Icons.lightbulb_outline,
+                      "Pista extra",
+                      "Te da una pista sobre la posición correcta",
+                      _advantagesBlocked ? null : () {
+                        Navigator.pop(context);
+                        _getHintCorrectPosition();
+                      },
+                    ),
+
+                    // 🔥 2️⃣ REVELAR UN NÚMERO
+                    _advantageOption(
+                      context,
+                      Icons.visibility,
+                      "Revelar un número",
+                      "Muestra un número correcto aleatorio",
+                      _advantagesBlocked ? null : () {
+                        Navigator.pop(context);
+                        _revealOpponentNumber();
+                      },
+                    ),
+
+                    // 🔥 3️⃣ REPETIR INTENTO
+                    _advantageOption(
+                      context,
+                      Icons.undo,
+                      "Repetir intento",
+                      "Te permite volver a intentar sin penalización",
+                      _advantagesBlocked ? null : () {
+                        Navigator.pop(context);
+                        _useRepeatTurn();
+                      },
+                    ),
+
+                    // 🔥 4️⃣ BLOQUEAR VENTAJAS DEL OPONENTE
+                    _advantageOption(
+                      context,
+                      Icons.block,
+                      "Bloquear ventajas del oponente",
+                      "Evita que el oponente use ventajas por 2 turnos",
+                      _advantagesBlocked ? null : () {
+                        Navigator.pop(context);
+                        _blockOpponentAdvantages();
+                      },
+                    ),
+                  ],
+                ),
               ),
 
-              // 🔥 2️⃣ REVELAR UN NÚMERO
-              _advantageOption(
-                context,
-                Icons.visibility,
-                "Revelar un número",
-                "Muestra un número correcto aleatorio",
-                _advantagesBlocked
-                    ? () {}
-                    : () {
-                  Navigator.pop(context);
-                  _revealOpponentNumber();
-                },
-              ),
+              SizedBox(height: 10), // 🔥 Espacio extra para que el botón no quede pegado
 
-              // 🔥 3️⃣ REPETIR INTENTO
-              _advantageOption(
-                context,
-                Icons.undo,
-                "Repetir intento",
-                "Te permite volver a intentar sin penalización",
-                _advantagesBlocked
-                    ? () {}
-                    : () {
-                  Navigator.pop(context);
-                  _useRepeatTurn();
-                },
-              ),
-
-              // 🔥 4️⃣ BLOQUEAR VENTAJAS DEL OPONENTE
-              _advantageOption(
-                context,
-                Icons.block,
-                "Bloquear ventajas del oponente",
-                "Evita que el oponente use ventajas por 2 turnos",
-                _advantagesBlocked
-                    ? () {}
-                    : () {
-                  Navigator.pop(context);
-                  _blockOpponentAdvantages();
-                },
-              ),
-
-              SizedBox(height: 15),
+              // 🔥 Botón de cierre estilizado
               TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  backgroundColor: Colors.redAccent.withOpacity(0.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
                 onPressed: () => Navigator.pop(context),
-                child: Text("Cerrar", style: TextStyle(color: Colors.redAccent, fontSize: 18)),
+                child: Text(
+                  "Cerrar",
+                  style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -910,16 +922,21 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
-
-  /// 🔥 **FUNCIÓN PARA CREAR UNA OPCIÓN DEL BOTTOM SHEET**
-  Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.amberAccent),
-      title: Text(title, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-      subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
-      onTap: onTap, // 🔥 Si las ventajas están bloqueadas, la función será vacía `() {}`
+// 🔥 Función mejorada para representar las opciones con Cards
+  Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback? onTap) {
+    return Card(
+      color: Colors.grey[900], // 🔥 Fondo gris oscuro para resaltar la opción
+      margin: EdgeInsets.symmetric(vertical: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: Icon(icon, color: Colors.amberAccent),
+        title: Text(title, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+        subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
+        onTap: onTap, // 🔥 Se cerrará automáticamente al pulsar
+      ),
     );
   }
+
 
   /// 🔥 ESCUCHAR SI EL OPONENTE BLOQUEA TUS VENTAJAS
   void _listenForAdvantageBlock(String message) {
