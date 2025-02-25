@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:guess_number/winner_screen.dart';
@@ -5,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
+import 'package:lottie/lottie.dart'; // 🔥 Importar Lottie
+import 'dart:async'; // 🔥 Para el temporizador
 
 import 'main.dart';
 
@@ -34,7 +37,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   String opponentUsername = ""; // Guarda el nombre fijo del oponente
 // 🔥 VARIABLES NUEVAS (deben estar en la clase `_GameScreenState`)
   bool _advantagesBlocked = false; // Indica si las ventajas del jugador están bloqueadas
-  int _blockedTurnsRemaining = 0; // Cantidad de turnos bloqueados
+  int _blockedTurnsRemaining = 2; // Cantidad de turnos bloqueados
   bool _opponentAdvantagesBlocked = false; // Indica si el oponente está bloqueado
   int _remainingAdvantages = 2; // 🔥 Cada jugador empieza con 2 intentos de ventajas
   late Map<String, int> _userAdvantages = {
@@ -43,7 +46,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     "advantage_repeat_attempt": 0,
     "advantage_block_opponent": 0,
   };
-
+  bool _showBlockAnimation = false; // 🔥 Controla la visibilidad de la animación
 
 
 
@@ -190,9 +193,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             setState(() {
               turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
               isTurnDefined = true;
-
               // 🔥 Reducir contador de turnos bloqueados si aún está activo
-              if (_advantagesBlocked && _blockedTurnsRemaining > 0) {
+              if (_advantagesBlocked && _blockedTurnsRemaining > 0 && data["blockedBy"] != username) {
                 _blockedTurnsRemaining--;
 
                 // 🔥 Si el contador llega a 0, desbloquear ventajas
@@ -847,20 +849,30 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
           await _useAdvantage("advantage_block_opponent"); // 🔥 Resta la ventaja en la BD
           await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
         } else {
+          Navigator.pop(context); // 🔥 Cierra el Bottom Sheet
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("⚠️ No puedes bloquear ventajas ahora.")),
           );
         }
+      } else if (response.statusCode == 403) {
+        // 🔥 El usuario ya está bloqueado, cerrar el Bottom Sheet y mostrar mensaje
+        Navigator.pop(context);
+        final errorData = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorData["error"] ?? "🚫 No puedes usar esta ventaja.")),
+        );
       } else {
         throw Exception("Error al bloquear ventajas.");
       }
     } catch (e) {
       print("❌ Error al bloquear ventajas: $e");
+      Navigator.pop(context); // 🔥 Asegurar que el Bottom Sheet se cierre en caso de error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("❌ No se pudo bloquear las ventajas.")),
       );
     }
   }
+
 
 
   Future<void> _showAdvantagesBottomSheet(BuildContext context) async {
@@ -1100,7 +1112,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
 
 
-  /// 🔥 ESCUCHAR SI EL OPONENTE BLOQUEA TUS VENTAJAS
   void _listenForAdvantageBlock(String message) {
     try {
       final data = jsonDecode(message);
@@ -1109,11 +1120,21 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         setState(() {
           _advantagesBlocked = true;
           _blockedTurnsRemaining = 2; // 🔥 Bloqueo inicial de 2 turnos
+          _showBlockAnimation = true; // 🔥 Activar la animación
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("🚫 ¡Tu oponente ha bloqueado tus ventajas por 2 turnos!")),
-        );
+        // 🔥 Ocultar la animación después de 3 segundos
+        Timer(Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _showBlockAnimation = false;
+            });
+          }
+        });
+
+        //ScaffoldMessenger.of(context).showSnackBar(
+          //SnackBar(content: Text("🚫 ¡Tu oponente ha bloqueado tus ventajas por 2 turnos!")),
+        //);
       }
     } catch (e) {
       print("❌ Error al procesar bloqueo de ventajas: $e");
@@ -1462,7 +1483,24 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                 ),
               ],
             ),
-
+// 🔥 Animación flotante cuando se active
+            if (_showBlockAnimation)
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.35, // 📍 Posición vertical en el centro
+                left: MediaQuery.of(context).size.width * 0.5 - 75, // 📍 Centrado horizontalmente
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7), // 🔥 Fondo semi-transparente
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Lottie.asset(
+                    'assets/block.json', // 🔥 Ruta de la animación Lottie
+                    repeat: false,
+                  ),
+                ),
+              ),
             // 🔥 Emojis flotantes que NO afectan el input
             for (var emoji in floatingEmojis) _buildFloatingEmoji(emoji),
           ],
