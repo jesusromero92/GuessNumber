@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:guess_number/game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'ShopScreen.dart';
 import 'banner_ad_widget.dart';
 import 'top_bar.dart'; // 🔥 Importar el TopBar
 import 'CreateRoomScreen.dart';
@@ -560,6 +561,7 @@ class _MainScreenState extends State<MainScreen> {
                   BannerAdWidget(), // 🔥 Banner de AdMob fijo abajo
                 ],
               ),
+
             ],
           ),
         );
@@ -567,6 +569,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// 🔥 Contenido ajustado (Centrado horizontalmente pero más arriba, SIN fondo en el icono)
   /// 🔥 Contenido ajustado (Centrado horizontalmente pero más arriba, SIN fondo en el icono)
   Widget _buildContent(double iconSize, double titleFontSize, double buttonHeight, double buttonFontSize) {
     return Align(
@@ -631,11 +634,34 @@ class _MainScreenState extends State<MainScreen> {
               fontSize: buttonFontSize,
               onPressed: () => _showAvailableRooms(context),
             ),
+
+            SizedBox(height: 20), // 🔥 Espacio extra antes del botón de tienda
+
+            // 🔥 Botón de la tienda PEQUEÑO
+            FloatingActionButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => ShopScreen(),
+                    transitionDuration: Duration.zero, // 🔥 Sin animación
+                    reverseTransitionDuration: Duration.zero, // 🔥 Sin animación al volver
+                  ),
+                );
+              },
+              backgroundColor: Colors.blueAccent,
+              child: Icon(Icons.shopping_cart, color: Colors.white, size: 32),
+            ),
+
+
+
+
+            SizedBox(height: 20), // 🔥 Espaciado antes del banner
           ],
         ),
       ),
     );
   }
+
 
 
 

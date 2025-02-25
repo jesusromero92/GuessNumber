@@ -94,7 +94,7 @@ class _TopBarState extends State<TopBar> {
               // 🔹 Monedas y Botón de Login/Logout (Derecha)
               Row(
                 children: [
-                  if (UserData.username.isNotEmpty && UserData.coins > 0) ...[
+                  if (UserData.username.isNotEmpty) ...[
                     Icon(Icons.stars, color: Colors.amberAccent, size: 20), // 🔥 Ícono cambiado
                     SizedBox(width: 4),
                     Text(

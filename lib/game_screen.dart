@@ -37,6 +37,13 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   int _blockedTurnsRemaining = 0; // Cantidad de turnos bloqueados
   bool _opponentAdvantagesBlocked = false; // Indica si el oponente está bloqueado
   int _remainingAdvantages = 2; // 🔥 Cada jugador empieza con 2 intentos de ventajas
+  late Map<String, int> _userAdvantages = {
+    "advantage_hint_extra": 0,
+    "advantage_reveal_number": 0,
+    "advantage_repeat_attempt": 0,
+    "advantage_block_opponent": 0,
+  };
+
 
 
 
@@ -123,6 +130,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     final args = ModalRoute.of(context)!.settings.arguments as Map;
     username = args['username'];
     roomId = args['roomId'];
+    _fetchUserAdvantages(); // 🔥 Cargar ventajas del usuario al entrar en la sala
 
     if (_channel == null) { // ✅ Evita crear múltiples conexiones
       _channel = IOWebSocketChannel.connect(
@@ -539,7 +547,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
-  void _revealOpponentNumber() async {
+  Future<void> _revealOpponentNumber(BuildContext context) async {
     try {
       final response = await http.get(
         Uri.parse('http://109.123.248.19:4000/reveal-number/$roomId/$username'),
@@ -549,6 +557,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         final data = jsonDecode(response.body);
         String revealedDigit = data['digit']?.toString() ?? "❓"; // 🔥 Obtener el dígito revelado
 
+        Navigator.pop(context); // 🔥 Cerrar el Bottom Sheet primero
+
         // 🔥 Mostrar el dígito en un SnackBar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -556,6 +566,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             duration: Duration(seconds: 4),
           ),
         );
+
+        await _useAdvantage("advantage_reveal_number"); // 🔥 Resta en la BD
         await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
       } else {
         throw Exception("Error al obtener el número del oponente.");
@@ -563,12 +575,11 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     } catch (e) {
       print("❌ Error en la solicitud de revelar número: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("❌ No se pudo revelar el número."),
-        ),
+        SnackBar(content: Text("❌ No se pudo revelar el número.")),
       );
     }
   }
+
 
 
   Future<void> _getHintCorrectPosition() async {
@@ -674,16 +685,22 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         final data = jsonDecode(response.body);
         String message;
         Color bgColor;
-        await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
+
         if (data["found"] == true) {
           message = "📍 El número ${data["digit"]} está en la posición ${data["position"] + 1}.";
-          bgColor = Colors.green.withOpacity(0.8); // ✅ Verde claro transparente
+          bgColor = Colors.green.withOpacity(0.8);
         } else {
           message = "❌ El número $digit NO está en el número secreto del oponente.";
-          bgColor = Colors.red.withOpacity(0.8); // ✅ Rojo claro transparente
+          bgColor = Colors.red.withOpacity(0.8);
         }
 
-        // 🔥 Mostrar el resultado en un **diálogo moderno**
+        // 🔥 Si la API fue exitosa, restar la ventaja en la BD
+        await _useAdvantage("advantage_hint_extra");
+
+        // 🔥 Actualizar la cantidad de ventajas restantes en la UI
+        await _fetchAdvantagesLeft();
+
+        // 🔥 Mostrar el resultado en un diálogo moderno
         showDialog(
           context: context,
           builder: (context) {
@@ -736,7 +753,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
-  void _useRepeatTurn() async {
+
+  Future<void> _useRepeatTurn(BuildContext context) async {
     try {
       final response = await http.post(
         Uri.parse('http://109.123.248.19:4000/repeat-turn'),
@@ -750,10 +768,14 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data["success"] == true) {
-          await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
+          Navigator.pop(context); // 🔥 Cerrar el modal primero
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("🔄 ¡Puedes hacer otro intento sin cambiar el turno!")),
           );
+
+          await _useAdvantage("advantage_repeat_attempt"); // 🔥 Resta en la BD
+          await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas disponibles
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("⚠️ No puedes repetir turno ahora.")),
@@ -771,8 +793,11 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
+
+
+
   /// 🔥 FUNCIÓN PARA BLOQUEAR LAS VENTAJAS DEL OPONENTE
-  void _blockOpponentAdvantages() async {
+  Future<void> _blockOpponentAdvantages(BuildContext context) async {
     try {
       final response = await http.post(
         Uri.parse('http://109.123.248.19:4000/block-advantages'),
@@ -785,8 +810,10 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
         if (data["success"] == true) {
-          await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
+          Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de actualizar
+
           setState(() {
             _opponentAdvantagesBlocked = true; // ✅ Bloquear ventajas del oponente
           });
@@ -802,6 +829,9 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
             "blockedBy": username,
             "roomId": roomId,
           }));
+
+          await _useAdvantage("advantage_block_opponent"); // 🔥 Resta la ventaja en la BD
+          await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas restantes
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("⚠️ No puedes bloquear ventajas ahora.")),
@@ -818,25 +848,30 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     }
   }
 
+
   Future<void> _showAdvantagesBottomSheet(BuildContext context) async {
-    await _fetchAdvantagesLeft(); // 🔥 Obtener ventajas restantes antes de mostrar el Bottom Sheet
+    await _fetchAdvantagesLeft(); // 🔥 Asegura que la cantidad de ventajas esté actualizada
+    if (mounted){
+      setState(() {
+      });
+    }
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // 🔥 Control total del tamaño
+      isScrollControlled: true,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       backgroundColor: Color(0xFF1E1E1E), // 🔥 Un color gris oscuro en vez de negro puro
       builder: (context) {
         return Container(
-          height: 500, // 🔥 Altura fija para que no crezca ni se expanda
+          height: 500,
           padding: EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 🔥 Título
               Text(
-                "Ventajas Disponibles ($_remainingAdvantages)", // 🔥 Mostrar intentos restantes
+                "Ventajas Disponibles ($_remainingAdvantages)",
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               SizedBox(height: 10),
@@ -854,51 +889,65 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
               Expanded(
                 child: ListView(
                   children: [
-                    // 🔥 1️⃣ PISTA EXTRA
                     _advantageOption(
                       context,
                       Icons.lightbulb_outline,
                       "Pista extra",
                       "Te da una pista sobre la posición correcta",
-                      _advantagesBlocked ? null : () {
+                      _userAdvantages["advantage_hint_extra"] ?? 0, // 🔥 Cantidad de ventajas del usuario
+                      (_advantagesBlocked || (_userAdvantages["advantage_hint_extra"] ?? 0) <= 0)
+                          ? null // 🔥 Bloqueado o sin ventajas disponibles
+                          : () async {
                         Navigator.pop(context);
-                        _getHintCorrectPosition();
+                        bool hintSuccess = _getHintCorrectPosition() as bool; // 🔥 Ejecutar primero la función
+                        if (hintSuccess) {
+                          await _useAdvantage("advantage_hint_extra"); // 🔥 Si fue exitosa, restar en la BD
+                        }
                       },
                     ),
 
-                    // 🔥 2️⃣ REVELAR UN NÚMERO
+
+
+
                     _advantageOption(
                       context,
                       Icons.visibility,
                       "Revelar un número",
                       "Muestra un número correcto aleatorio",
-                      _advantagesBlocked ? null : () {
-                        Navigator.pop(context);
-                        _revealOpponentNumber();
+                      _userAdvantages["advantage_reveal_number"] ?? 0,
+                      (_advantagesBlocked || (_userAdvantages["advantage_reveal_number"] ?? 0) <= 0)
+                          ? null
+                          : () async {
+                        //Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de ejecutar
+                        await _revealOpponentNumber(context);
                       },
                     ),
 
-                    // 🔥 3️⃣ REPETIR INTENTO
                     _advantageOption(
                       context,
                       Icons.undo,
                       "Repetir intento",
                       "Te permite volver a intentar sin penalización",
-                      _advantagesBlocked ? null : () {
-                        Navigator.pop(context);
-                        _useRepeatTurn();
+                      _userAdvantages["advantage_repeat_attempt"] ?? 0,
+                      (_advantagesBlocked || (_userAdvantages["advantage_repeat_attempt"] ?? 0) <= 0)
+                          ? null
+                          : () async {
+                        //Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de ejecutar
+                        await _useRepeatTurn(context);
                       },
                     ),
 
-                    // 🔥 4️⃣ BLOQUEAR VENTAJAS DEL OPONENTE
                     _advantageOption(
                       context,
                       Icons.block,
                       "Bloquear ventajas del oponente",
                       "Evita que el oponente use ventajas por 2 turnos",
-                      _advantagesBlocked ? null : () {
-                        Navigator.pop(context);
-                        _blockOpponentAdvantages();
+                      _userAdvantages["advantage_block_opponent"] ?? 0,
+                      (_advantagesBlocked || (_userAdvantages["advantage_block_opponent"] ?? 0) <= 0)
+                          ? null
+                          : () async {
+                        //Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de ejecutar
+                        await _blockOpponentAdvantages(context);
                       },
                     ),
                   ],
@@ -907,7 +956,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
               SizedBox(height: 10), // 🔥 Espacio extra para que el botón no quede pegado
 
-              // 🔥 Botón de cierre estilizado
               TextButton(
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -928,20 +976,91 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
+
 // 🔥 Función mejorada para representar las opciones con Cards
-  Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback? onTap) {
+  Widget _advantageOption(
+      BuildContext context, IconData icon, String title, String description, int quantity, VoidCallback? onTap) {
     return Card(
       color: Colors.grey[900], // 🔥 Fondo gris oscuro para resaltar la opción
       margin: EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(icon, color: Colors.amberAccent),
-        title: Text(title, style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(
+          "$title ($quantity)", // 🔥 Muestra la cantidad disponible
+          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
-        onTap: onTap, // 🔥 Se cerrará automáticamente al pulsar
+        onTap: (quantity > 0) ? onTap : null, // 🔥 Solo permite usar si tiene al menos 1
+        trailing: (quantity > 0)
+            ? IconButton(
+          icon: Icon(Icons.play_arrow, color: Colors.greenAccent), // 🔥 Icono para usar ventaja
+          onPressed: onTap, // 🔥 Activa la función solo si hay cantidad
+        )
+            : Icon(Icons.lock, color: Colors.redAccent), // 🔥 Si no tiene, muestra candado
       ),
     );
   }
+
+
+  Future<void> _fetchUserAdvantages() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://109.123.248.19:4000/get-user-advantages/$username'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _userAdvantages = {
+              "advantage_hint_extra": data["advantage_hint_extra"] ?? 0,
+              "advantage_reveal_number": data["advantage_reveal_number"] ?? 0,
+              "advantage_repeat_attempt": data["advantage_repeat_attempt"] ?? 0,
+              "advantage_block_opponent": data["advantage_block_opponent"] ?? 0,
+            };
+          });
+        }
+      } else {
+        print("❌ Error al obtener ventajas: ${response.body}");
+      }
+    } catch (e) {
+      print("❌ Error en la solicitud de ventajas: $e");
+    }
+  }
+
+  Future<void> _useAdvantage(String advantageColumn) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://109.123.248.19:4000/use-advantage'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "username": username,  // 🔥 El nombre del usuario en la partida
+          "advantage": advantageColumn, // 🔥 La columna a descontar
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("✅ ${data['message']}")),
+        );
+
+        await _fetchAdvantagesLeft(); // 🔥 Actualiza las ventajas disponibles
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ ${data['error']}")),
+        );
+      }
+    } catch (e) {
+      print("❌ Error al usar ventaja: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ No se pudo usar la ventaja.")),
+      );
+    }
+  }
+
 
   Future<void> _fetchAdvantagesLeft() async {
     try {
