@@ -793,6 +793,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
           // 🔥 Enviar notificación por WebSocket
           _channel?.sink.add(jsonEncode({
             "type": "advantages_blocked",
+            "username": username, // ✅ Asegura que tenga un username
             "blockedBy": username,
             "roomId": roomId,
           }));
@@ -812,7 +813,6 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     }
   }
 
-  /// 🔥 BOTTOM SHEET DE VENTAJAS MODIFICADO
   void _showAdvantagesBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -841,36 +841,60 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                   ),
                 ),
 
-              _advantageOption(
-                context,
-                Icons.block,
-                "Bloquear ventajas del oponente",
-                "Evita que el oponente use ventajas por 2 turnos",
-                _advantagesBlocked ? () {} : _blockOpponentAdvantages, // 🔥 Deshabilita si está bloqueado
-              ),
-
-              _advantageOption(
-                context,
-                Icons.visibility,
-                "Revelar un número",
-                "Muestra un número correcto aleatorio",
-                _advantagesBlocked ? () {} : _revealOpponentNumber,
-              ),
-
+              // 🔥 1️⃣ PISTA EXTRA
               _advantageOption(
                 context,
                 Icons.lightbulb_outline,
                 "Pista extra",
                 "Te da una pista sobre la posición correcta",
-                _advantagesBlocked ? () {} : _getHintCorrectPosition,
+                _advantagesBlocked
+                    ? () {}
+                    : () {
+                  Navigator.pop(context);
+                  _getHintCorrectPosition();
+                },
               ),
 
+              // 🔥 2️⃣ REVELAR UN NÚMERO
+              _advantageOption(
+                context,
+                Icons.visibility,
+                "Revelar un número",
+                "Muestra un número correcto aleatorio",
+                _advantagesBlocked
+                    ? () {}
+                    : () {
+                  Navigator.pop(context);
+                  _revealOpponentNumber();
+                },
+              ),
+
+              // 🔥 3️⃣ REPETIR INTENTO
               _advantageOption(
                 context,
                 Icons.undo,
                 "Repetir intento",
                 "Te permite volver a intentar sin penalización",
-                _advantagesBlocked ? () {} : _useRepeatTurn,
+                _advantagesBlocked
+                    ? () {}
+                    : () {
+                  Navigator.pop(context);
+                  _useRepeatTurn();
+                },
+              ),
+
+              // 🔥 4️⃣ BLOQUEAR VENTAJAS DEL OPONENTE
+              _advantageOption(
+                context,
+                Icons.block,
+                "Bloquear ventajas del oponente",
+                "Evita que el oponente use ventajas por 2 turnos",
+                _advantagesBlocked
+                    ? () {}
+                    : () {
+                  Navigator.pop(context);
+                  _blockOpponentAdvantages();
+                },
               ),
 
               SizedBox(height: 15),
@@ -884,6 +908,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       },
     );
   }
+
+
 
   /// 🔥 **FUNCIÓN PARA CREAR UNA OPCIÓN DEL BOTTOM SHEET**
   Widget _advantageOption(BuildContext context, IconData icon, String title, String description, VoidCallback onTap) {
