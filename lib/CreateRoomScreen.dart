@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -202,13 +203,16 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           SizedBox(height: 15), // 🔥 Reduce el espacio
 
           // 🔥 Campo de ID de Sala
+          // 🔥 Campo de ID de Sala (Solo Números)
           TextField(
             controller: _roomController,
+            keyboardType: TextInputType.number, // 🔥 Solo números
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly], // 🔥 Restringe la entrada
             style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white.withOpacity(0.2),
-              hintText: "ID de Sala",
+              hintText: "ID de Sala (solo números)",
               hintStyle: TextStyle(color: Colors.white70),
               prefixIcon: Icon(Icons.meeting_room, color: Colors.white),
               border: OutlineInputBorder(

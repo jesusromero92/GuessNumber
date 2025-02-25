@@ -48,6 +48,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   };
   bool _showBlockAnimation = false; // 🔥 Controla la visibilidad de la animación
   bool _isMounted = true; // 🔥 Nueva variable para saber si el widget sigue en pantalla.
+  bool _show2XAnimation = false; // Controla la animación
+
 
 
 
@@ -783,9 +785,9 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         if (data["success"] == true) {
           Navigator.pop(context); // 🔥 Cerrar el modal primero
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("🔄 ¡Puedes hacer otro intento sin cambiar el turno!")),
-          );
+          //ScaffoldMessenger.of(context).showSnackBar(
+            //SnackBar(content: Text("🔄 ¡Puedes hacer otro intento sin cambiar el turno!")),
+          //);
 
           await _useAdvantage("advantage_repeat_attempt"); // 🔥 Resta en la BD
           await _fetchAdvantagesLeft(); // 🔥 Actualizar la cantidad de ventajas disponibles
@@ -1058,17 +1060,33 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         Uri.parse('http://109.123.248.19:4000/use-advantage'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "username": username,  // 🔥 El nombre del usuario en la partida
-          "advantage": advantageColumn, // 🔥 La columna a descontar
+          "username": username,
+          "advantage": advantageColumn,
         }),
       );
 
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        //ScaffoldMessenger.of(context).showSnackBar(
-          //SnackBar(content: Text("✅ ${data['message']}")),
-        //);
+        if (mounted) {
+          setState(() {
+            // 🔥 Solo activa la animación de "2X" si la ventaja es de repetición de turno
+            if (advantageColumn == "advantage_repeat_attempt") {
+              _show2XAnimation = true;
+            }
+          });
+
+          // 🔥 Oculta la animación después de 2 segundos solo si está activa
+          if (_show2XAnimation) {
+            Future.delayed(Duration(seconds: 2), () {
+              if (mounted) {
+                setState(() {
+                  _show2XAnimation = false;
+                });
+              }
+            });
+          }
+        }
 
         await _fetchAdvantagesLeft(); // 🔥 Actualiza las ventajas disponibles
       } else {
@@ -1083,6 +1101,8 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       );
     }
   }
+
+
 
 
   Future<void> _fetchAdvantagesLeft() async {
@@ -1480,6 +1500,42 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
                 ),
               ],
             ),
+            if (_show2XAnimation)
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.35, // 📍 Más arriba en la pantalla
+                left: MediaQuery.of(context).size.width * 0.5 - 75, // 📍 Centrado horizontalmente
+                child: AnimatedOpacity(
+                  duration: Duration(milliseconds: 500),
+                  opacity: _show2XAnimation ? 1.0 : 0.0, // 🔥 Control de opacidad
+                  child: TweenAnimationBuilder<double>(
+                    duration: Duration(milliseconds: 800),
+                    tween: Tween(begin: 0.8, end: 2.2), // 🔥 Escalado más grande
+                    builder: (context, scale, child) {
+                      return Transform.scale(
+                        scale: scale,
+                        child: child,
+                      );
+                    },
+                    child: Text(
+                      "2X",
+                      style: TextStyle(
+                        fontSize: 100, // 🔥 Aumentado el tamaño de la fuente
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent, // 🔥 Azul brillante
+                        shadows: [
+                          Shadow(
+                            blurRadius: 10.0,
+                            color: Colors.blue, // 🔥 Agrega un efecto de brillo
+                            offset: Offset(0, 0),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+
 // 🔥 Animación flotante cuando se active
             if (_showBlockAnimation)
               Positioned(
