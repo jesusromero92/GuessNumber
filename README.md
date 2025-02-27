@@ -1,16 +1,51 @@
-# adivinar_numeros2
+# 🎮 Adivina el Número - Juego Multijugador Online
 
-A new Flutter project.
+**Adivina el Número** es un juego de estrategia y lógica donde debes descubrir el número secreto de tu oponente antes de que él descubra el tuyo. Utiliza pistas y ventajas para ganar la partida.
 
-## Getting Started
+## 🚀 Características
+- **Modo Online**: Enfréntate a jugadores de todo el mundo en partidas rápidas y dinámicas.
+- **Sistema de Ventajas**: Usa habilidades como revelar un número, repetir intento y bloquear al rival.
+- **Recompensas**: Gana monedas jugando o viendo anuncios y utilízalas en la tienda.
+- **Diseño Intuitivo**: Interfaz amigable y fácil de jugar.
 
-This project is a starting point for a Flutter application.
+## 📦 Instalación
+1. Clona el repositorio:
+   ```sh
+   git clone https://github.com/tuusuario/adivina-el-numero.git
+   ```
+2. Entra en el directorio del proyecto:
+   ```sh
+   cd adivina-el-numero
+   ```
+3. Instala las dependencias de Flutter:
+   ```sh
+   flutter pub get
+   ```
+4. Ejecuta la aplicación:
+   ```sh
+   flutter run
+   ```
 
-A few resources to get you started if this is your first Flutter project:
+## 🛠 Tecnologías Utilizadas
+- **Flutter** para el desarrollo de la app.
+- **Dart** como lenguaje principal.
+- **Node.js + Express** para la API.
+- **MySQL** para la base de datos.
+- **Google AdMob** para la monetización con anuncios.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 📌 Cómo Jugar
+1. Inicia sesión o juega como invitado.
+2. Únete a una sala o crea la tuya.
+3. Intenta adivinar el número de tu oponente antes de que él adivine el tuyo.
+4. Usa estrategias y ventajas para ganar.
+5. ¡Suma monedas y desbloquea más opciones!
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🤝 Contribuciones
+Si quieres contribuir al proyecto, ¡serás bienvenido! Realiza un fork, haz tus cambios y envía un pull request.
+
+## 📄 Licencia
+Este proyecto está bajo la licencia MIT.
+
+---
+💡 **Desarrollado por [Tu Nombre](https://github.com/tuusuario)**
+
