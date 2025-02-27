@@ -8,6 +8,7 @@ import 'package:web_socket_channel/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart'; // 🔥 Importar Lottie
 import 'dart:async'; // 🔥 Para el temporizador
+import 'package:vibration/vibration.dart';
 
 import 'main.dart';
 
@@ -198,6 +199,11 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
               turnUsername = data["turn"] ?? data["turnUsername"] ?? "";
               isTurnDefined = true;
 
+              // 🔥 Si es mi turno, vibrar el teléfono
+              if (turnUsername == username) {
+                _vibrateOnTurn();
+              }
+
               // 🔥 Solo reducir el bloqueo cuando el oponente juega
               if (_advantagesBlocked && _blockedTurnsRemaining > 0 && turnUsername != username) {
                 _blockedTurnsRemaining--;
@@ -225,6 +231,13 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       _registerUser();
     }
   }
+
+  void _vibrateOnTurn() async {
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(duration: 500); // 🔥 Vibra por 500ms cuando es tu turno
+    }
+  }
+
 
 
   /// 🔥 Muestra el modal inferior con más emojis variados
@@ -880,10 +893,10 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
   Future<void> _showAdvantagesBottomSheet(BuildContext context) async {
     await _fetchAdvantagesLeft(); // 🔥 Asegura que la cantidad de ventajas esté actualizada
-    if (mounted){
-      setState(() {
-      });
+    if (mounted) {
+      setState(() {}); // 🔥 Asegura que la UI refleje los cambios antes de abrir el BottomSheet
     }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -892,113 +905,108 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       ),
       backgroundColor: Color(0xFF1E1E1E), // 🔥 Un color gris oscuro en vez de negro puro
       builder: (context) {
-        return Container(
-          height: 500,
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 🔥 Título
-              Text(
-                "Ventajas Disponibles ($_remainingAdvantages)",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              SizedBox(height: 10),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // 🔥 Monitorear si entra un segundo jugador
+            Timer.periodic(Duration(seconds: 2), (timer) {
+              if (!isWaiting) {
+                timer.cancel(); // 🔥 Detener el chequeo si ya entró el segundo jugador
+                if (mounted) {
+                  setModalState(() {}); // 🔥 Actualiza el BottomSheet sin cerrarlo
+                }
+              }
+            });
 
-              // 🔥 Aviso de bloqueo de ventajas
-              if (_advantagesBlocked)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    "🚫 Tus ventajas están bloqueadas por $_blockedTurnsRemaining turnos.",
-                    style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+            return Container(
+              height: 500,
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Ventajas Disponibles ($_remainingAdvantages)",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                ),
+                  SizedBox(height: 10),
 
-              Expanded(
-                child: ListView(
-                  children: [
-                    _advantageOption(
-                      context,
-                      Icons.lightbulb_outline,
-                      "Pista extra",
-                      "Te da una pista sobre la posición correcta",
-                      _userAdvantages["advantage_hint_extra"] ?? 0, // 🔥 Cantidad de ventajas del usuario
-                      (_advantagesBlocked || (_userAdvantages["advantage_hint_extra"] ?? 0) <= 0)
-                          ? null // 🔥 Bloqueado o sin ventajas disponibles
-                          : () async {
-                        Navigator.pop(context);
-                        bool hintSuccess = _getHintCorrectPosition() as bool; // 🔥 Ejecutar primero la función
-                        if (hintSuccess) {
-                          await _useAdvantage("advantage_hint_extra"); // 🔥 Si fue exitosa, restar en la BD
-                        }
-                      },
+                  if (isWaiting)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        "⏳ Esperando a un segundo jugador...",
+                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                      ),
                     ),
 
-
-
-
-                    _advantageOption(
-                      context,
-                      Icons.visibility,
-                      "Revelar un número",
-                      "Muestra un número correcto aleatorio",
-                      _userAdvantages["advantage_reveal_number"] ?? 0,
-                      (_advantagesBlocked || (_userAdvantages["advantage_reveal_number"] ?? 0) <= 0)
-                          ? null
-                          : () async {
-                        //Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de ejecutar
-                        await _revealOpponentNumber(context);
-                      },
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        _advantageOption(
+                          context,
+                          Icons.lightbulb_outline,
+                          "Pista extra",
+                          "Te da una pista sobre la posición correcta",
+                          _userAdvantages["advantage_hint_extra"] ?? 0,
+                          (isWaiting || _advantagesBlocked) ? null : () async {
+                            Navigator.pop(context);
+                            bool hintSuccess = _getHintCorrectPosition() as bool;
+                            if (hintSuccess) {
+                              await _useAdvantage("advantage_hint_extra");
+                            }
+                          },
+                        ),
+                        _advantageOption(
+                          context,
+                          Icons.visibility,
+                          "Revelar un número",
+                          "Muestra un número correcto aleatorio",
+                          _userAdvantages["advantage_reveal_number"] ?? 0,
+                          (isWaiting || _advantagesBlocked) ? null : () async {
+                            await _revealOpponentNumber(context);
+                          },
+                        ),
+                        _advantageOption(
+                          context,
+                          Icons.undo,
+                          "Repetir intento",
+                          "Te permite volver a intentar sin penalización",
+                          _userAdvantages["advantage_repeat_attempt"] ?? 0,
+                          (isWaiting || _advantagesBlocked) ? null : () async {
+                            await _useRepeatTurn(context);
+                          },
+                        ),
+                        _advantageOption(
+                          context,
+                          Icons.block,
+                          "Bloquear ventajas del oponente",
+                          "Evita que el oponente use ventajas por 2 turnos",
+                          _userAdvantages["advantage_block_opponent"] ?? 0,
+                          (isWaiting || _advantagesBlocked) ? null : () async {
+                            await _blockOpponentAdvantages(context);
+                          },
+                        ),
+                      ],
                     ),
+                  ),
 
-                    _advantageOption(
-                      context,
-                      Icons.undo,
-                      "Repetir intento",
-                      "Te permite volver a intentar sin penalización",
-                      _userAdvantages["advantage_repeat_attempt"] ?? 0,
-                      (_advantagesBlocked || (_userAdvantages["advantage_repeat_attempt"] ?? 0) <= 0)
-                          ? null
-                          : () async {
-                        //Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de ejecutar
-                        await _useRepeatTurn(context);
-                      },
-                    ),
+                  SizedBox(height: 10),
 
-                    _advantageOption(
-                      context,
-                      Icons.block,
-                      "Bloquear ventajas del oponente",
-                      "Evita que el oponente use ventajas por 2 turnos",
-                      _userAdvantages["advantage_block_opponent"] ?? 0,
-                      (_advantagesBlocked || (_userAdvantages["advantage_block_opponent"] ?? 0) <= 0)
-                          ? null
-                          : () async {
-                        //Navigator.pop(context); // 🔥 Cierra el Bottom Sheet antes de ejecutar
-                        await _blockOpponentAdvantages(context);
-                      },
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      backgroundColor: Colors.redAccent.withOpacity(0.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                  ],
-                ),
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      "Cerrar",
+                      style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
-
-              SizedBox(height: 10), // 🔥 Espacio extra para que el botón no quede pegado
-
-              TextButton(
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  backgroundColor: Colors.redAccent.withOpacity(0.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  "Cerrar",
-                  style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -1006,30 +1014,32 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
 
 
 
-// 🔥 Función mejorada para representar las opciones con Cards
+
   Widget _advantageOption(
       BuildContext context, IconData icon, String title, String description, int quantity, VoidCallback? onTap) {
     return Card(
-      color: Colors.grey[900], // 🔥 Fondo gris oscuro para resaltar la opción
+      color: isWaiting ? Colors.grey[800] : Colors.grey[900], // 🔥 Si está esperando, se ve más apagado
       margin: EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(icon, color: Colors.amberAccent),
+        leading: Icon(icon, color: isWaiting ? Colors.grey : Colors.amberAccent),
         title: Text(
-          "$title ($quantity)", // 🔥 Muestra la cantidad disponible
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+          "$title ($quantity)",
+          style: TextStyle(
+            fontSize: 18,
+            color: isWaiting ? Colors.grey : Colors.white, // 🔥 Si está esperando, se ve gris
+            fontWeight: FontWeight.bold,
+          ),
         ),
         subtitle: Text(description, style: TextStyle(fontSize: 14, color: Colors.white70)),
-        onTap: (quantity > 0) ? onTap : null, // 🔥 Solo permite usar si tiene al menos 1
-        trailing: (quantity > 0)
-            ? IconButton(
-          icon: Icon(Icons.play_arrow, color: Colors.greenAccent), // 🔥 Icono para usar ventaja
-          onPressed: onTap, // 🔥 Activa la función solo si hay cantidad
-        )
-            : Icon(Icons.lock, color: Colors.redAccent), // 🔥 Si no tiene, muestra candado
+        onTap: (quantity > 0 && !isWaiting) ? onTap : null, // 🔥 Bloqueado hasta que entre el oponente
+        trailing: (quantity > 0 && !isWaiting)
+            ? IconButton(icon: Icon(Icons.play_arrow, color: Colors.greenAccent), onPressed: onTap)
+            : Icon(Icons.lock, color: Colors.redAccent), // 🔥 Bloqueado con un candado
       ),
     );
   }
+
 
 
   Future<void> _fetchUserAdvantages() async {

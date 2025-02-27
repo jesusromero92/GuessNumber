@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import 'main.dart';
+
 class WinnerScreen extends StatelessWidget {
   final String winnerUsername;
   final String guessedNumber; // ✅ Nuevo: número adivinado
@@ -51,7 +53,14 @@ class WinnerScreen extends StatelessWidget {
             // 🔥 Botón para volver al inicio
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/');
+                Navigator.of(context).pushAndRemoveUntil(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
+                    transitionDuration: Duration.zero, // ❌ Sin animación de transición
+                    reverseTransitionDuration: Duration.zero, // ❌ Sin animación de reversa
+                  ),
+                      (route) => false, // 🔥 Elimina todas las pantallas anteriores
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueAccent,
@@ -65,6 +74,7 @@ class WinnerScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 18, color: Colors.white),
               ),
             ),
+
           ],
         ),
       ),
