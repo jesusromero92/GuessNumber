@@ -9,6 +9,7 @@
 - **Diseño Intuitivo**: Interfaz amigable y fácil de jugar.
 
 ## 📦 Instalación
+Pronto en Google Play Store.
 1. Clona el repositorio:
    ```sh
    git clone https://github.com/tuusuario/adivina-el-numero.git
@@ -47,5 +48,5 @@ Si quieres contribuir al proyecto, ¡serás bienvenido! Realiza un fork, haz tus
 Este proyecto está bajo la licencia MIT.
 
 ---
-💡 **Desarrollado por [Tu Nombre](https://github.com/tuusuario)**
+💡 **Desarrollado por [jesusromero92](https://github.com/jesusromero92)**
 
