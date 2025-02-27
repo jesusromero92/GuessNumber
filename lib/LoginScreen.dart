@@ -100,58 +100,64 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade900, Colors.blue.shade500],
+      resizeToAvoidBottomInset: false, // 🔥 Evita que el contenido se mueva al abrir el teclado
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // 🔥 Cierra el teclado al tocar fuera
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.blue.shade900, Colors.blue.shade500],
+            ),
           ),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, size: 50, color: Colors.blue.shade900),
-                ),
-                SizedBox(height: 20),
-                Text(
-                  "Welcome Back",
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 20),
-                _buildTextField("Username", Icons.person, _usernameController, false),
-                SizedBox(height: 10),
-                _buildTextField("Password", Icons.lock, _passwordController, true),
-                SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text("Forgot Password?", style: TextStyle(color: Colors.white70)),
-                ),
-                SizedBox(height: 20),
-                _buildLoginButton(),
-                SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/register');
-                  },
-                  child: Text(
-                    "Don't have an account? Sign Up",
-                    style: TextStyle(color: Colors.white),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, size: 50, color: Colors.blue.shade900),
                   ),
-                ),
-              ],
+                  SizedBox(height: 20),
+                  Text(
+                    "Bienvenido de nuevo",
+                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 20),
+                  _buildTextField("Nombre de usuario", Icons.person, _usernameController, false),
+                  SizedBox(height: 10),
+                  _buildTextField("Contraseña", Icons.lock, _passwordController, true),
+                  SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text("¿Olvidaste tu contraseña?", style: TextStyle(color: Colors.white70)),
+                  ),
+                  SizedBox(height: 20),
+                  _buildLoginButton(),
+                  SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/register');
+                    },
+                    child: Text(
+                      "¿No tienes una cuenta? Regístrate",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+
 
   Widget _buildTextField(String hintText, IconData icon, TextEditingController controller, bool obscureText) {
     return TextField(

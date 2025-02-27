@@ -187,12 +187,18 @@ class _ShopScreenState extends State<ShopScreen> {
       return;
     }
 
-    String username = UserData.username; // 🔥 Usar el usuario desde UserData
+    String username = UserData.username; // 🔥 Obtener el usuario desde UserData
 
-    if (username.isEmpty || username.startsWith("Guest")) {
-      _showSnackbar("⚠️ Error: Usuario no válido.");
-      print("❌ No se encontró un usuario válido.");
-      return;
+    // 🔥 Si no hay usuario, generar uno automáticamente y guardarlo en SharedPreferences
+    if (username.isEmpty) {
+      username = "guest_${DateTime.now().millisecondsSinceEpoch}";
+      UserData.username = username;
+
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('username', username);
+      });
+
+      print("🆕 Usuario guest creado: $username");
     }
 
     _rewardedAd!.show(
@@ -201,7 +207,7 @@ class _ShopScreenState extends State<ShopScreen> {
           final response = await http.post(
             Uri.parse("$apiUrl/watch-ad"),
             headers: {"Content-Type": "application/json"},
-            body: jsonEncode({"username": username}), // 🔥 Se envía el usuario correcto
+            body: jsonEncode({"username": username}), // 🔥 Enviar el usuario correcto
           );
 
           final data = jsonDecode(response.body);
@@ -209,7 +215,6 @@ class _ShopScreenState extends State<ShopScreen> {
           if (response.statusCode == 200 && data["success"] == true) {
             await UserData.fetchCoinsFromAPI(); // 🔥 Obtener monedas desde la API y actualizar
 
-            // 🔥 ACTUALIZAR `ShopScreen` con las monedas obtenidas
             setState(() {
               _coins = UserData.coins; // Se sincroniza con `UserData`
             });
@@ -229,6 +234,7 @@ class _ShopScreenState extends State<ShopScreen> {
       },
     );
   }
+
 
 
 
