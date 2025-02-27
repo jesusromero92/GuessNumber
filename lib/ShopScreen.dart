@@ -66,11 +66,12 @@ class _ShopScreenState extends State<ShopScreen> {
 
 
   Future<void> _loadCoins() async {
-    final prefs = await SharedPreferences.getInstance();
+    await UserData.fetchCoinsFromAPI(); // 🔥 Obtener datos actualizados del servidor
     setState(() {
-      _coins = prefs.getInt('coins') ?? 0;
+      _coins = UserData.coins; // 🔥 Actualizar UI con el valor correcto
     });
   }
+
 
   Future<void> _updateCoins(int amount) async {
     final prefs = await SharedPreferences.getInstance();
@@ -186,30 +187,54 @@ class _ShopScreenState extends State<ShopScreen> {
       return;
     }
 
+    String username = UserData.username; // 🔥 Usar el usuario desde UserData
+
+    if (username.isEmpty || username.startsWith("Guest")) {
+      _showSnackbar("⚠️ Error: Usuario no válido.");
+      print("❌ No se encontró un usuario válido.");
+      return;
+    }
+
     _rewardedAd!.show(
       onUserEarnedReward: (AdWithoutView ad, RewardItem reward) async {
-        final response = await http.post(
-          Uri.parse("$apiUrl/watch-ad"),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({"username": "user"}), // Usa el usuario real aquí
-        );
+        try {
+          final response = await http.post(
+            Uri.parse("$apiUrl/watch-ad"),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({"username": username}), // 🔥 Se envía el usuario correcto
+          );
 
-        if (response.statusCode == 200) {
-          await _updateCoins(50);
-          _showSnackbar("🎉 ¡Has ganado 50 monedas! 🪙");
-        } else {
-          _showSnackbar("⚠️ No se pudo obtener la recompensa.");
+          final data = jsonDecode(response.body);
+
+          if (response.statusCode == 200 && data["success"] == true) {
+            await UserData.fetchCoinsFromAPI(); // 🔥 Obtener monedas desde la API y actualizar
+
+            // 🔥 ACTUALIZAR `ShopScreen` con las monedas obtenidas
+            setState(() {
+              _coins = UserData.coins; // Se sincroniza con `UserData`
+            });
+
+            _showSnackbar("🎉 ¡Has ganado 50 monedas! 🪙");
+          } else {
+            _showSnackbar("⚠️ No se pudo obtener la recompensa: ${data['error']}");
+          }
+        } catch (e) {
+          _showSnackbar("❌ Error al conectar con el servidor.");
+          print("❌ Error en la solicitud de recompensa: $e");
         }
 
         _rewardedAd!.dispose();
+        _rewardedAd = null;
         _loadRewardedAd();
       },
     );
   }
 
 
+
+
   Future<void> _buyAdvantage(Map<String, dynamic> advantage) async {
-    final String username = UserData.username; // Obtiene el usuario desde UserData
+    final String username = UserData.username;
 
     if (username.isEmpty) {
       _showSnackbar("⚠️ Error: Usuario no encontrado.");
@@ -229,7 +254,7 @@ class _ShopScreenState extends State<ShopScreen> {
     final url = Uri.parse("$apiUrl/buy-advantage");
     final headers = {"Content-Type": "application/json"};
     final body = jsonEncode({
-      "username": username, // Se envía el usuario correcto desde UserData
+      "username": username,
       "advantage": advantage["column"],
       "price": advantage["price"]
     });
@@ -245,7 +270,12 @@ class _ShopScreenState extends State<ShopScreen> {
       log("Cuerpo de la respuesta: ${response.body}");
 
       if (response.statusCode == 200) {
-        await _updateCoins(-advantage["price"]);
+        await UserData.fetchCoinsFromAPI(); // 🔥 Obtener monedas desde la API y actualizar
+
+        setState(() {
+          _coins = UserData.coins; // 🔥 Se actualizan las monedas en la UI
+        });
+
         _showSnackbar("✅ Has comprado ${advantage["name"]}.");
         log("Compra exitosa. Monedas restantes: $_coins");
       } else {
@@ -257,6 +287,7 @@ class _ShopScreenState extends State<ShopScreen> {
       log("Excepción atrapada: $e");
     }
   }
+
 
 
 
