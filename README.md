@@ -8,6 +8,11 @@
 - **Recompensas**: Gana monedas jugando o viendo anuncios y utilízalas en la tienda.
 - **Diseño Intuitivo**: Interfaz amigable y fácil de jugar.
 
+## 🖼️ Capturas de Pantalla
+![Pantalla Principal](assets/screenshots/main_screen.png)
+![Partida en Curso](assets/screenshots/gameplay.png)
+![Tienda de Ventajas](assets/screenshots/shop.png)
+
 ## 📦 Instalación
 Pronto en Google Play Store.
 1. Clona el repositorio:
