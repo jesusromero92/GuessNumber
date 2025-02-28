@@ -41,6 +41,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   int _blockedTurnsRemaining = 2; // Cantidad de turnos bloqueados
   bool _opponentAdvantagesBlocked = false; // Indica si el oponente está bloqueado
   int _remainingAdvantages = 2; // 🔥 Cada jugador empieza con 2 intentos de ventajas
+  Timer? _closeRoomTimer; // 🔥 Temporizador para cerrar la sala
   late Map<String, int> _userAdvantages = {
     "advantage_hint_extra": 0,
     "advantage_reveal_number": 0,
@@ -60,6 +61,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     _channel?.sink.close();
     _emojiChannel?.sink.close();
     WidgetsBinding.instance.removeObserver(this); // 🔥 Remover el observer
+    _closeRoomTimer?.cancel(); // 🔥 Cancelar temporizador si aún está activo
     _isMounted = false; // 🔥 Marcar que el widget ya no está activo.
     super.dispose();
   }
@@ -94,10 +96,20 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
     }
   }
 
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _checkIfRoomExists(); // 🔥 Comprobar si la sala aún existe al volver al primer plano
+    if (state == AppLifecycleState.paused) {
+      print("⏳ La app fue minimizada, comenzando temporizador de 5 segundos...");
+
+      _closeRoomTimer = Timer(Duration(seconds: 5), () async {
+        print("🚨 La app estuvo minimizada por más de 5 segundos. Cerrando la sala...");
+        await _handleExit(); // 🔥 Llamar la función que elimina la sala
+      });
+
+    } else if (state == AppLifecycleState.resumed) {
+      print("✅ La app volvió antes de los 5 segundos, cancelando el cierre de la sala.");
+      _closeRoomTimer?.cancel(); // 🔥 Cancelamos el temporizador si la app vuelve a primer plano
     }
   }
 
@@ -436,12 +448,10 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
   }
 
 
-  Future<bool> _handleExit() async {
-    if (hasExited) return false; // 🔥 Evita ejecutar la salida más de una vez
-    hasExited = true; // 🔥 Marcar que el usuario ha salido
-
+  Future<void> _handleExit() async {
+    print("🚪 Cerrando sala y volviendo al menú principal...");
     try {
-      // 🔥 Si es el creador, intenta eliminar la sala antes de salir
+      // 🔥 Eliminar la sala del servidor
       await http.delete(Uri.parse('http://109.123.248.19:4000/api/rooms/$roomId'));
 
       // 🔥 Notificar a los demás jugadores que abandonaste
@@ -450,7 +460,7 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         "username": username
       }));
 
-      // 🔥 Cerrar WebSocket y limpiar referencias
+      // 🔥 Cerrar WebSocket
       _channel?.sink.close();
       _channel = null;
 
@@ -458,13 +468,11 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
       _emojiChannel = null;
 
       if (mounted) {
-        // 🔥 Verificar si ya se está mostrando un snackbar para evitar spam
-        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Has salido de la sala.")),
+          SnackBar(content: Text("⚠️ Has salido de la sala por inactividad.")),
         );
 
-        // 🔥 Volver a la pantalla principal sin animación
+        // 🔥 Volver al menú principal
         Navigator.of(context).pushAndRemoveUntil(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => MainScreen(),
@@ -475,11 +483,10 @@ class _GameScreenState extends State<GameScreenGame> with WidgetsBindingObserver
         );
       }
     } catch (e) {
-      print("❌ Error al salir de la sala: $e");
+      print("❌ Error al cerrar la sala: $e");
     }
-
-    return Future.value(true);
   }
+
 
 
 
